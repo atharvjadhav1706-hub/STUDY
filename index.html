@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEET 2027 V15.2 - OLED Pro Engine</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        :root {
+            /* Light Theme Variables */
+            --bg-color: #f1f2f6;
+            --text-main: #1e272e; 
+            --text-sub: #576574;  
+            --glass-base: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(255, 255, 255, 1);
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --input-bg: rgba(255, 255, 255, 0.9);
+            --check-bg: #ffffff;
+            --glow-1: rgba(9, 132, 227, 0.05);
+            --glow-2: rgba(232, 67, 147, 0.05);
+            --color-scheme: light;
+            
+            /* STRICTLY UNIQUE MASTER PALETTE */
+            --phy: #0984e3;        /* Blue */
+            --chem: #d35400;       /* Orange */
+            --bio: #e84393;        /* Rose */
+            --mission: #00b894;    /* Mint */
+            --rev: #6c5ce7;        /* Indigo/Purple */
+            --prio: #16a085;       /* Teal */
+            --comp: #f39c12;       /* Gold */
+            --sched: #2c3e50;      /* Slate */
+            
+            --success: #00b894;
+            --danger: #ff4757;
+            --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body.dark-mode {
+            /* OLED Pure Black Theme Variables */
+            --bg-color: #000000;
+            --text-main: #f5f6fa; 
+            --text-sub: #a4b0be;  
+            --glass-base: rgba(15, 15, 15, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --card-bg: rgba(18, 18, 18, 0.95);
+            --input-bg: rgba(25, 25, 25, 0.9);
+            --check-bg: #0a0a0a;
+            --glow-1: rgba(9, 132, 227, 0.15);
+            --glow-2: rgba(232, 67, 147, 0.12);
+            --color-scheme: dark;
+        }
+
+        * { box-sizing: border-box; font-family: var(--font-stack); -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+
+        body {
+            padding: 20px; padding-bottom: 100px;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, var(--glow-1) 0, transparent 55%), 
+                radial-gradient(at 100% 100%, var(--glow-2) 0, transparent 55%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            transition: background-color 0.4s ease, color 0.4s ease;
+            color-scheme: var(--color-scheme);
+        }
+
+        .container { max-width: 600px; margin: 0 auto; }
+
+        /* --- HEADER & HAMBURGER --- */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        .app-title {
+            font-size: 1.9rem; font-weight: 900; letter-spacing: -1px; text-transform: uppercase; margin: 0;
+            background: linear-gradient(135deg, var(--text-main), var(--text-sub));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .header-actions { display: flex; align-items: center; gap: 15px; }
+        .streak-pill { 
+            background: var(--card-bg); border: 1px solid var(--glass-border);
+            color: #d35400; padding: 8px 18px; border-radius: 20px; font-weight: 900; font-size: 1rem;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.06); transition: 0.3s;
+        }
+        
+        .menu-btn {
+            background: var(--card-bg); border: 1px solid var(--glass-border);
+            color: var(--text-main); font-size: 1.4rem; padding: 6px 12px; border-radius: 14px;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.05); transition: 0.2s; display: grid; place-items: center;
+        }
+        .menu-btn:active { transform: scale(0.9); }
+
+        /* --- PRO SIDE MENU --- */
+        .side-menu-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            z-index: 999; opacity: 0; pointer-events: none; transition: 0.3s ease;
+        }
+        .side-menu-overlay.active { opacity: 1; pointer-events: all; }
+        .side-menu {
+            position: absolute; top: 0; right: -320px; width: 300px; height: 100%;
+            background: var(--bg-color); box-shadow: -10px 0 40px rgba(0,0,0,0.5);
+            transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1); padding: 30px 20px;
+            display: flex; flex-direction: column; gap: 12px; border-left: 1px solid var(--glass-border);
+        }
+        .side-menu-overlay.active .side-menu { right: 0; }
+        
+        .menu-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px;}
+        .menu-header h2 { font-weight: 900; color: var(--text-main); font-size: 1.5rem; letter-spacing: -0.5px;}
+        .menu-close { background: none; border: none; font-size: 2rem; color: var(--text-main); cursor: pointer; line-height: 1;}
+        
+        .menu-item {
+            display: flex; align-items: center; gap: 15px; padding: 14px 18px; border-radius: 16px;
+            font-weight: 800; font-size: 0.95rem; color: var(--text-main); cursor: pointer; background: var(--card-bg);
+            border: 1px solid var(--glass-border); transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+        }
+        .menu-item:active { transform: scale(0.96); }
+        .menu-icon { font-size: 1.3rem; }
+
+        /* Switch Toggle UI */
+        .toggle-track { width: 44px; height: 24px; background: #dfe6e9; border-radius: 12px; position: relative; border: 1px solid var(--glass-border); transition: 0.3s; }
+        .toggle-thumb { width: 18px; height: 18px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 3px; transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        body.dark-mode .toggle-track { background: var(--success); border-color: var(--success); }
+        body.dark-mode .toggle-thumb { left: 21px; background: white; }
+
+        /* --- PREMIUM TINTED GLASSMORPHISM --- */
+        .glass-box {
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px; padding: 25px; margin-bottom: 25px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.05); transition: 0.3s;
+        }
+        
+        .glass-mission { background: linear-gradient(135deg, var(--glass-base), rgba(0, 184, 148, 0.15)); border-left: 6px solid var(--mission); }
+        .glass-phy { background: linear-gradient(135deg, var(--glass-base), rgba(9, 132, 227, 0.15)); border-left: 6px solid var(--phy); }
+        .glass-chem { background: linear-gradient(135deg, var(--glass-base), rgba(211, 84, 0, 0.15)); border-left: 6px solid var(--chem); }
+        .glass-bio { background: linear-gradient(135deg, var(--glass-base), rgba(232, 67, 147, 0.15)); border-left: 6px solid var(--bio); }
+        .glass-prio { background: linear-gradient(135deg, var(--glass-base), rgba(22, 160, 133, 0.15)); border-left: 6px solid var(--prio); }
+        .glass-rev { background: linear-gradient(135deg, var(--glass-base), rgba(108, 92, 231, 0.15)); border-left: 6px solid var(--rev); }
+        .glass-comp { background: linear-gradient(135deg, var(--glass-base), rgba(243, 156, 18, 0.15)); border-left: 6px solid var(--comp); }
+        .glass-sched { background: linear-gradient(135deg, var(--glass-base), rgba(44, 62, 80, 0.15)); border-left: 6px solid var(--sched); }
+
+        .box-title { font-size: 1.15rem; font-weight: 900; color: var(--text-main); text-transform: uppercase; margin-bottom: 20px; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: space-between; }
+
+        /* --- PURPLE ANIMATED COUNTDOWN GLASS --- */
+        .countdown {
+            background: linear-gradient(135deg, rgba(142, 68, 173, 0.85), rgba(108, 92, 231, 0.95));
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 28px; padding: 25px; margin-bottom: 30px;
+            text-align: center; position: relative; overflow: hidden;
+            box-shadow: 0 20px 40px -10px rgba(108, 92, 231, 0.3); color: white;
+        }
+        .countdown::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.25), transparent);
+            transform: skewX(-25deg); animation: shine 4s infinite cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        @keyframes shine { 0% { left: -100%; } 20% { left: 200%; } 100% { left: 200%; } }
+
+        .timer-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 15px; position:relative; z-index:2; }
+        .t-box { background: rgba(0, 0, 0, 0.2); backdrop-filter: blur(5px); padding: 15px 5px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.1); }
+        .t-val { font-size: 1.8rem; font-weight: 900; display: block; line-height: 1.1; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        .t-lbl { font-size: 0.65rem; color: rgba(255,255,255,0.9); text-transform: uppercase; font-weight: 800; letter-spacing: 1px; margin-top: 4px; }
+
+        /* --- DUAL RINGS --- */
+        .double-ring-wrap { position: relative; width: 110px; height: 110px; flex-shrink: 0; }
+        .double-ring-wrap svg { transform: rotate(-90deg); width: 100%; height: 100%; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); }
+        .ring-bg { fill: none; stroke: var(--glass-border); stroke-width: 8; opacity: 0.5;}
+        .ring-outer, .ring-inner { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 1.5s cubic-bezier(0.16, 1, 0.3, 1); }
+        .hero-ring-center { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+        .ring-pct { font-size: 1.2rem; font-weight: 900; color: var(--text-main); }
+
+        /* --- PCB GRID --- */
+        .pcb-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 35px; }
+        .subject-card {
+            border-radius: 24px; padding: 25px; position: relative; overflow: hidden; cursor: pointer;
+            display: flex; align-items: center; justify-content: space-between;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .subject-card:active { transform: scale(0.97); }
+        .sub-info { display: flex; align-items: center; gap: 20px; }
+        .sub-icon { font-size: 3.2rem; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); }
+        .sub-title { font-weight: 900; font-size: 1.6rem; color: var(--text-main); letter-spacing: -0.5px; }
+
+        /* --- TASK CARDS --- */
+        .task-card {
+            background: var(--card-bg); border-radius: 16px; padding: 16px 20px; margin-bottom: 10px;
+            display: flex; align-items: center; justify-content: space-between;
+            border: 1px solid var(--glass-border); position: relative; overflow: hidden; transition: 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03); color: var(--text-main);
+        }
+        .task-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:5px; border-radius:16px 0 0 16px; }
+        .task-card.phy::before { background: var(--phy); }
+        .task-card.chem::before { background: var(--chem); }
+        .task-card.bio::before { background: var(--bio); }
+        .task-card.rev::before { background: var(--rev); }
+        .task-card.comp::before { background: var(--comp); }
+
+        .task-card.done { opacity: 0.5; background: var(--glass-base); }
+        .task-card.done .task-title { text-decoration: line-through; color: var(--text-sub); }
+
+        .checkbox {
+            width: 28px; height: 28px; border: 2px solid var(--text-sub); border-radius: 8px;
+            cursor: pointer; display: grid; place-items: center; flex-shrink: 0; margin-right: 15px; transition: 0.3s; background: var(--check-bg);
+        }
+        .checkbox.checked { background: var(--success); border-color: var(--success); box-shadow: 0 0 15px rgba(0, 184, 148, 0.4); transform: scale(1.1); }
+        .checkbox.checked::after { content: '✓'; color: white; font-weight: 900; font-size: 14px; }
+
+        .task-content { flex: 1; min-width: 0; }
+        .task-title { font-weight: 800; font-size: 0.95rem; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;}
+        .task-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        
+        .badge { font-size: 0.6rem; font-weight: 900; padding: 4px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .badge-phy { background: rgba(9, 132, 227, 0.15); color: var(--phy); }
+        .badge-chem { background: rgba(211, 84, 0, 0.15); color: var(--chem); }
+        .badge-bio { background: rgba(232, 67, 147, 0.15); color: var(--bio); }
+        .badge-time { background: var(--input-bg); color: var(--text-sub); border: 1px solid var(--glass-border);}
+        .badge-rev-lec { background: rgba(108, 92, 231, 0.15); color: var(--rev); }
+        .badge-rev-sub { background: rgba(255, 71, 87, 0.15); color: var(--danger); }
+        .badge-comp { background: rgba(243, 156, 18, 0.15); color: var(--comp); }
+
+        .date-header { font-size: 0.85rem; font-weight: 900; color: var(--text-sub); text-transform: uppercase; margin: 25px 0 10px 5px; letter-spacing: 1px; display: flex; align-items: center; gap: 8px;}
+        
+        .btn-delete { background: var(--card-bg); border: 1px solid var(--glass-border); color: var(--danger); font-size: 1.4rem; cursor: pointer; padding: 4px 12px; border-radius:10px; font-weight:900; transition: 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.02); display:flex; align-items:center; justify-content:center; height: 38px;}
+        .btn-delete:active { transform: scale(0.85); background: #ff4757; color: white; border-color: #ff4757; }
+        
+        .btn-done-rev { border:none; background: var(--card-bg); box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid var(--glass-border); padding:10px 14px; border-radius:10px; font-weight:900; cursor:pointer; transition:0.2s; color: var(--rev); font-size:0.8rem;}
+        .btn-done-rev:active { transform: scale(0.95); }
+
+        /* --- SMART ACCORDION --- */
+        details.pipeline-group { 
+            margin-bottom: 12px; background: var(--card-bg); 
+            border: 1px solid var(--glass-border); border-radius: 16px; 
+            overflow: hidden; transition: 0.3s; box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+        }
+        summary.pipeline-date { 
+            font-weight: 900; color: var(--rev); font-size: 0.9rem; padding: 18px 20px; 
+            cursor: pointer; display: flex; justify-content: space-between; align-items: center; list-style: none; outline:none;
+        }
+        summary.pipeline-date::-webkit-details-marker { display: none; }
+        .pipeline-list { padding: 0 20px 20px 20px; display: flex; flex-direction: column; gap: 8px; }
+        details[open] summary.pipeline-date .chevron { transform: rotate(180deg); }
+        .chevron { transition: 0.3s; font-size: 0.8rem; color: var(--text-sub); }
+
+        /* --- INPUTS & BUTTONS --- */
+        .input-label { font-size: 0.7rem; color: var(--text-sub); font-weight: 900; margin-bottom: 6px; display: block; letter-spacing: 1px; margin-top: 15px;}
+        select, input[type="text"], input[type="date"], input[type="number"] { 
+            width: 100%; padding: 14px 16px; background: var(--input-bg); border: 1px solid var(--glass-border); 
+            color: var(--text-main); border-radius: 14px; outline: none; font-size: 0.9rem; font-weight: 700;
+            transition: 0.2s; box-shadow: inset 0 2px 5px rgba(0,0,0,0.02);
+        }
+        select:focus, input:focus { border-color: var(--text-main); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .timer-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        
+        /* Previous Lecture Hint */
+        .prev-hint { font-size: 0.75rem; color: var(--success); font-weight: 800; margin-top: 6px; margin-bottom: 12px; min-height: 14px; font-style: italic;}
+
+        .action-btn { 
+            width: 100%; padding: 18px; color: white; 
+            font-weight: 900; border: none; border-radius: 16px; cursor: pointer; 
+            font-size: 0.95rem; text-transform: uppercase; margin-top: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); transition: 0.2s;
+        }
+        .action-btn:active { transform: translateY(2px); }
+
+        /* --- NAV & TABS --- */
+        .page-view { display: none; animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .page-view.active { display: block; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .back-arrow { 
+            display: inline-flex; align-items: center; justify-content: center; 
+            width: 42px; height: 42px; border-radius: 50%; cursor: pointer; 
+            margin-bottom: 25px; background: var(--card-bg); border: 1px solid var(--glass-border); 
+            color: var(--text-main); font-size: 1.3rem; font-weight: 900; 
+            box-shadow: 0 8px 20px rgba(0,0,0,0.05); transition: 0.2s;
+        }
+        .back-arrow:active { transform: scale(0.9); }
+
+        .tab-btn { flex: 1; padding: 12px; font-weight: 900; border: 1px solid var(--glass-border); background: var(--card-bg); border-radius: 12px; cursor: pointer; color: var(--text-sub); transition: 0.2s; font-size:0.85rem; text-transform: uppercase;}
+        
+        .tab-btn.phy.active { background: var(--phy) !important; color: white !important; border-color: var(--phy) !important;}
+        .tab-btn.chem.active { background: var(--chem) !important; color: white !important; border-color: var(--chem) !important;}
+        .tab-btn.bio.active { background: var(--bio) !important; color: white !important; border-color: var(--bio) !important;}
+        
+        .seq-row { display: flex; align-items: center; margin-bottom: 10px; background: var(--card-bg); padding: 10px; border-radius: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.02); border: 1px solid var(--glass-border);}
+        .seq-row input { width: 60px; margin-bottom: 0; margin-right: 15px; text-align: center; padding: 10px;}
+
+        .svg-defs { width: 0; height: 0; position: absolute; }
+    </style>
+</head>
+<body>
+
+<!-- SVG Gradients -->
+<svg class="svg-defs">
+  <defs>
+    <linearGradient id="gradPhyOuter" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0984e3"/><stop offset="100%" stop-color="#341f97"/></linearGradient>
+    <linearGradient id="gradPhyInner" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00cec9"/><stop offset="100%" stop-color="#81ecec"/></linearGradient>
+    <linearGradient id="gradChemOuter" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#d35400"/><stop offset="100%" stop-color="#c0392b"/></linearGradient>
+    <linearGradient id="gradChemInner" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f1c40f"/><stop offset="100%" stop-color="#f39c12"/></linearGradient>
+    <linearGradient id="gradBioOuter" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#e84393"/><stop offset="100%" stop-color="#b71540"/></linearGradient>
+    <linearGradient id="gradBioInner" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fd79a8"/><stop offset="100%" stop-color="#a29bfe"/></linearGradient>
+  </defs>
+</svg>
+
+<!-- PRO SLIDE MENU -->
+<div class="side-menu-overlay" id="mainMenu" onclick="closeMenu()">
+    <div class="side-menu" onclick="event.stopPropagation()">
+        <div class="menu-header">
+            <h2>MENU</h2>
+            <button class="menu-close" onclick="closeMenu()">×</button>
+        </div>
+        
+        <!-- Toggle Theme -->
+        <div class="menu-item" onclick="toggleTheme()" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span class="menu-icon" id="theme-icon">🌙</span> 
+                <span id="theme-text">Dark Mode</span>
+            </div>
+            <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        </div>
+        
+        <div style="height: 1px; background: var(--glass-border); margin: 5px 0;"></div>
+
+        <div class="menu-item" onclick="navFromMenu('priority-hub')"><span class="menu-icon">📊</span> Sequence</div>
+        <div class="menu-item" onclick="navFromMenu('chapter-hub')"><span class="menu-icon">🏆</span> Complete</div>
+        <div class="menu-item" onclick="navFromMenu('full-schedule')"><span class="menu-icon">📅</span> Schedule</div>
+        <div class="menu-item" onclick="navFromMenu('revision-hub')"><span class="menu-icon">🧠</span> Upcoming Revisions</div>
+        
+        <div style="flex-grow: 1;"></div>
+        
+        <div class="menu-item" style="background:var(--mission); color:white; border:none;" onclick="forceUpdateApp()">
+            <span class="menu-icon">🔄</span> Force Update
+        </div>
+
+        <div class="menu-item" style="color:var(--danger); border-color:var(--danger); background:rgba(255,71,87,0.1);" onclick="resetApp()">
+            <span class="menu-icon">⚠️</span> Full App Reset
+        </div>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="page-view active">
+        
+        <div class="header">
+            <div>
+                <h1 class="app-title">NEET 2027</h1>
+            </div>
+            <div class="header-actions">
+                <div class="streak-pill"><span id="streak-val">0</span> 🔥</div>
+                <button class="menu-btn" onclick="openMenu()">☰</button>
+            </div>
+        </div>
+
+        <div class="countdown">
+            <div style="font-size:0.75rem; font-weight:900; letter-spacing:3px; opacity:0.8; margin-bottom:12px; position:relative; z-index:2;">TARGET: 2 MAY 2027</div>
+            <div class="timer-grid">
+                <div class="t-box"><span id="d" class="t-val">00</span><span class="t-lbl">DAYS</span></div>
+                <div class="t-box"><span id="h" class="t-val">00</span><span class="t-lbl">HRS</span></div>
+                <div class="t-box"><span id="m" class="t-val">00</span><span class="t-lbl">MIN</span></div>
+                <div class="t-box"><span id="s" class="t-val">00</span><span class="t-lbl">SEC</span></div>
+            </div>
+        </div>
+
+        <!-- Today's Section -->
+        <div class="glass-box glass-mission">
+            <div class="box-title">⚡ Today's Missions</div>
+            <div id="dash-schedule"></div>
+            
+            <div class="box-title" style="margin-top:30px; border-top: 1px solid var(--glass-border); padding-top: 20px;">🚨 Due Revisions</div>
+            <div id="dash-rev-due"></div>
+        </div>
+
+        <!-- Tracking Section -->
+        <div class="pcb-grid">
+            <div class="subject-card glass-box glass-phy" onclick="openPage('phy')" style="margin-bottom:0;">
+                <div class="sub-info"><div class="sub-icon"></div><div class="sub-title">Physics</div></div>
+                <div class="double-ring-wrap">
+                    <svg viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="52" class="ring-bg"/><circle cx="60" cy="60" r="40" class="ring-bg"/>
+                        <circle id="phyOuter" cx="60" cy="60" r="52" class="ring-outer" stroke="url(#gradPhyOuter)" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+                        <circle id="phyInner" cx="60" cy="60" r="40" class="ring-inner" stroke="url(#gradPhyInner)" stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
+                    </svg>
+                    <div class="hero-ring-center"><div id="phyPct" class="ring-pct">0%</div></div>
+                </div>
+            </div>
+
+            <div class="subject-card glass-box glass-chem" onclick="openPage('chem')" style="margin-bottom:0;">
+                <div class="sub-info"><div class="sub-icon"></div><div class="sub-title">Chemistry</div></div>
+                <div class="double-ring-wrap">
+                    <svg viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="52" class="ring-bg"/><circle cx="60" cy="60" r="40" class="ring-bg"/>
+                        <circle id="chemOuter" cx="60" cy="60" r="52" class="ring-outer" stroke="url(#gradChemOuter)" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+                        <circle id="chemInner" cx="60" cy="60" r="40" class="ring-inner" stroke="url(#gradChemInner)" stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
+                    </svg>
+                    <div class="hero-ring-center"><div id="chemPct" class="ring-pct">0%</div></div>
+                </div>
+            </div>
+
+            <div class="subject-card glass-box glass-bio" onclick="openPage('bio')" style="margin-bottom:0;">
+                <div class="sub-info"><div class="sub-icon"></div><div class="sub-title">Biology</div></div>
+                <div class="double-ring-wrap">
+                    <svg viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="52" class="ring-bg"/><circle cx="60" cy="60" r="40" class="ring-bg"/>
+                        <circle id="bioOuter" cx="60" cy="60" r="52" class="ring-outer" stroke="url(#gradBioOuter)" stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+                        <circle id="bioInner" cx="60" cy="60" r="40" class="ring-inner" stroke="url(#gradBioInner)" stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
+                    </svg>
+                    <div class="hero-ring-center"><div id="bioPct" class="ring-pct">0%</div></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- PRIORITY HUB -->
+    <div id="priority-hub-page" class="page-view">
+        <div class="back-arrow" onclick="goHome()">&#8592;</div>
+        <div class="glass-box glass-prio">
+            <div style="display:flex; gap:10px; margin-bottom:20px;">
+                <button class="tab-btn phy active" id="btn-seq-phy" onclick="renderSequenceEditor('phy')">Physics</button>
+                <button class="tab-btn chem" id="btn-seq-chem" onclick="renderSequenceEditor('chem')">Chem</button>
+                <button class="tab-btn bio" id="btn-seq-bio" onclick="renderSequenceEditor('bio')">Biology</button>
+            </div>
+            <div id="seq-list-container"></div>
+            <button class="action-btn" style="background:var(--prio);" onclick="saveSequence()">SAVE SEQUENCE</button>
+        </div>
+    </div>
+
+    <!-- CHAPTER COMPLETION HUB -->
+    <div id="chapter-hub-page" class="page-view">
+        <div class="back-arrow" onclick="goHome()">&#8592;</div>
+        
+        <div class="glass-box glass-comp">
+            <div class="box-title">🏆 Log Completion</div>
+            <p style="font-size:0.8rem; color:var(--text-sub); margin-bottom:15px; font-weight:700;">Marking a chapter complete instantly triggers its recurring 30-Day Revision Cycle.</p>
+            
+            <span class="input-label">SUBJECT</span>
+            <select id="log-sub-select" onchange="updateLogChapSelect()">
+                <option value="phy">Physics</option>
+                <option value="chem">Chemistry</option>
+                <option value="bio">Biology</option>
+            </select>
+            
+            <span class="input-label">CHAPTER</span><select id="log-chap-select"></select>
+            <span class="input-label">COMPLETION DATE</span><input type="date" id="log-date-input">
+            
+            <button class="action-btn" style="background: var(--comp);" onclick="logChapterCompletion()">LOG COMPLETION</button>
+        </div>
+
+        <div class="glass-box glass-comp">
+            <div class="box-title">📜 Completed Chapters Log</div>
+            <div id="comp-log-list"></div>
+        </div>
+    </div>
+
+    <!-- REVISION HUB -->
+    <div id="revision-hub-page" class="page-view">
+        <div class="back-arrow" onclick="goHome()">&#8592;</div>
+        
+        <div class="glass-box glass-rev">
+            <div class="box-title">📅 Upcoming Revisions</div>
+            <p style="font-size:0.8rem; color:var(--text-sub); margin-bottom:20px; font-weight:700;">Tap a date folder to see exactly what revisions are coming up.</p>
+            <div id="dash-rev-upcoming"></div>
+        </div>
+    </div>
+
+    <!-- FULL SCHEDULE -->
+    <div id="full-schedule-page" class="page-view">
+        <div class="back-arrow" onclick="goHome()">&#8592;</div>
+        <div class="glass-box glass-sched">
+            <div class="box-title">📅 Master Schedule</div>
+            <div id="full-schedule-list"></div>
+        </div>
+    </div>
+
+    <!-- PHY ENGINE -->
+    <div id="phy-page" class="page-view">
+        <div class="back-arrow" onclick="goHome()">&#8592;</div>
+        <div class="glass-box glass-phy">
+            <h2 style="font-weight:900; margin-bottom:20px; color:var(--phy); font-size: 1.6rem;">Physics Engine</h2>
+            
+            <span class="input-label">CHAPTER (AUTO-SAVED)</span>
+            <select id="phy-select" onchange="updateLastSelected('phy', this.value)"></select>
+            <div id="phy-prev-hint" class="prev-hint"></div>
+
+            <span class="input-label">LECTURE NUMBER</span><input type="number" id="phy-lec" placeholder="e.g. 1">
+            <span class="input-label">DURATION</span>
+            <div class="timer-row">
+                <div><input type="number" id="phy-hr" placeholder="HR" min="0"></div>
+                <div><input type="number" id="phy-min" placeholder="MIN" min="0" max="59"></div>
+            </div>
+            <span class="input-label">DATE</span><input type="date" id="phy-date">
+            <button class="action-btn" style="background:var(--phy);" onclick="addTask('phy')">SCHEDULE MISSION</button>
+        </div>
+        <div class="box-title" style="margin-top: 25px;">Assigned Chapter Plan</div>
+        <div id="phy-list"></div>
+    </div>
+
+    <!-- CHEM ENGINE -->
+    <div id="chem-page" class="page-view">
+        <div class="back-arrow" onclick="goHome()">&#8592;</div>
+        <div class="glass-box glass-chem">
+            <h2 style="font-weight:900; margin-bottom:20px; color:var(--chem); font-size: 1.6rem;">Chemistry Engine</h2>
+            
+            <span class="input-label">CHAPTER (AUTO-SAVED)</span>
+            <select id="chem-select" onchange="updateLastSelected('chem', this.value)"></select>
+            <div id="chem-prev-hint" class="prev-hint"></div>
+
+            <span class="input-label">LECTURE NUMBER</span><input type="number" id="chem-lec" placeholder="e.g. 1">
+            <span class="input-label">DURATION</span>
+            <div class="timer-row">
+                <div><input type="number" id="chem-hr" placeholder="HR" min="0"></div>
+                <div><input type="number" id="chem-min" placeholder="MIN" min="0" max="59"></div>
+            </div>
+            <span class="input-label">DATE</span><input type="date" id="chem-date">
+            <button class="action-btn" style="background:var(--chem);" onclick="addTask('chem')">SCHEDULE MISSION</button>
+        </div>
+        <div class="box-title" style="margin-top: 25px;">Assigned Chapter Plan</div>
+        <div id="chem-list"></div>
+    </div>
+
+    <!-- BIO ENGINE -->
+    <div id="bio-page" class="page-view">
+        <div class="back-arrow" onclick="goHome()">&#8592;</div>
+        <div class="glass-box glass-bio">
+            <h2 style="font-weight:900; margin-bottom:20px; color:var(--bio); font-size: 1.6rem;">Biology Engine</h2>
+            
+            <span class="input-label">CHAPTER (AUTO-SAVED)</span>
+            <select id="bio-select" onchange="updateLastSelected('bio', this.value)"></select>
+            <div id="bio-prev-hint" class="prev-hint"></div>
+
+            <span class="input-label">LECTURE NUMBER</span><input type="number" id="bio-lec" placeholder="e.g. 1">
+            <span class="input-label">DURATION</span>
+            <div class="timer-row">
+                <div><input type="number" id="bio-hr" placeholder="HR" min="0"></div>
+                <div><input type="number" id="bio-min" placeholder="MIN" min="0" max="59"></div>
+            </div>
+            <span class="input-label">DATE</span><input type="date" id="bio-date">
+            <button class="action-btn" style="background:var(--bio);" onclick="addTask('bio')">SCHEDULE MISSION</button>
+        </div>
+        <div class="box-title" style="margin-top: 25px;">Assigned Chapter Plan</div>
+        <div id="bio-list"></div>
+    </div>
+
+</div>
+
+<script>
+    /* --- OPTIMIZED MASTER LOGIC ENGINE V15.2 (OLED PRO UI) --- */
+    
+    // Core Configuration
+    const SUBJECTS = ['phy', 'chem', 'bio'];
+    const TARGET_DATE = new Date(2027, 4, 2); 
+
+    // Master Syllabus
+    const baseSyllabus = {
+        phy: ["Basic Mathematics", "Vectors", "Units and Measurements", "Motion in a Straight Line", "Motion in a Plane", "Laws of Motion", "Work, Energy and Power", "Collision", "Center of Mass", "System of Particles and Rotational Motion", "Gravitation", "Mechanical Properties of Solids", "Mechanical Properties of Fluids", "Thermal Properties of Matter", "Thermodynamics", "Kinetic Theory of Gases", "Oscillations", "Waves", "Electric Charges and Fields", "Electrostatic Potential", "Capacitors", "Current Electricity", "Moving Charges and Magnetism", "Magnetism and Matter", "Electromagnetic Induction", "Alternating Current", "Electromagnetic Waves", "Ray Optics and Optical Instruments", "Wave Optics", "Dual Nature of Radiation and Matter", "Atoms", "Nuclei", "Semiconductor Electronics"],
+        chem: ["Some Basic Concepts of Chemistry", "Structure of Atom", "Classification of Elements and Periodicity", "Chemical Bonding and Molecular Structure", "States of Matter", "Thermodynamics", "Equilibrium", "Redox Reactions", "p-Block Elements", "d-Block and f-Block Elements", "Coordination Compounds", "Organic Chemistry: Some Basic Principles and Techniques", "IUPAC Nomenclature", "Isomerism", "Hydrocarbons", "Solutions", "Electrochemistry", "Chemical Kinetics", "Haloalkanes and Haloarenes", "Alcohols, Phenols and Ethers", "Aldehydes, Ketones and Carboxylic Acids", "Amines", "Biomolecules", "Salt Analysis"],
+        bio: ["The Living World", "Biological Classification", "Plant Kingdom", "Animal Kingdom", "Morphology of Flowering Plants", "Anatomy of Flowering Plants", "Structural Organisation in Animals", "Cell: The Unit of Life", "Biomolecules", "Cell Cycle and Cell Division", "Photosynthesis in Higher Plants", "Respiration in Plants", "Plant Growth and Development", "Breathing and Exchange of Gases", "Body Fluids and Circulation", "Excretory Products and their Elimination", "Locomotion and Movement", "Neural Control and Coordination", "Chemical Coordination and Integration", "Sexual Reproduction in Flowering Plants", "Human Reproduction", "Reproductive Health", "Principles of Inheritance and Variation", "Molecular Basis of Inheritance", "Evolution", "Human Health and Disease", "Microbes in Human Welfare", "Biotechnology: Principles and Processes", "Biotechnology and its Applications", "Organisms and Populations", "Ecosystem", "Biodiversity and Conservation"]
+    };
+
+    // State State
+    let customSeq = { phy: [], chem: [], bio: [] };
+    let scheduled = { phy: [], chem: [], bio: [] };
+    let revisionLogs = {}; 
+    let chapterCompletion = { phy: {}, chem: {}, bio: {} }; 
+    let lastSelectedChapter = { phy: "", chem: "", bio: "" }; 
+    let streak = 0, lastActive = "";
+    let currentEditSub = "phy";
+    let isDarkMode = false;
+
+    // Boot Routine
+    window.addEventListener('DOMContentLoaded', init);
+
+    function init() {
+        // Theme initialization
+        if(localStorage.getItem('neet_theme') === 'dark') {
+            isDarkMode = true;
+            document.body.classList.add('dark-mode');
+        }
+        updateThemeUI();
+
+        // Data initialization
+        try {
+            const saved = localStorage.getItem('neet_2027_v14');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                scheduled = parsed.scheduled || scheduled;
+                streak = parsed.streak || 0;
+                lastActive = parsed.lastActive || "";
+                customSeq = parsed.customSeq || { phy: [], chem: [], bio: [] };
+                revisionLogs = parsed.revisionLogs || {};
+                chapterCompletion = parsed.chapterCompletion || { phy: {}, chem: {}, bio: {} };
+                lastSelectedChapter = parsed.lastSelectedChapter || { phy: "", chem: "", bio: "" };
+            }
+        } catch(e) {}
+        
+        SUBJECTS.forEach(sub => {
+            if (!customSeq[sub] || customSeq[sub].length === 0) {
+                customSeq[sub] = baseSyllabus[sub].map((name, i) => ({ name, order: i + 1 }));
+            } else {
+                baseSyllabus[sub].forEach(baseChap => {
+                    if (!customSeq[sub].some(c => c.name === baseChap)) {
+                        customSeq[sub].push({ name: baseChap, order: customSeq[sub].length + 1 });
+                    }
+                });
+            }
+        });
+
+        handleStreak(false); 
+        updateLogChapSelect(); 
+        refreshActiveViews();
+    }
+
+    // --- PRO MENU FUNCTIONS ---
+    function openMenu() { 
+        document.getElementById('mainMenu').classList.add('active'); 
+        document.body.style.overflow = 'hidden'; // Stop background scrolling
+    }
+    
+    function closeMenu() { 
+        document.getElementById('mainMenu').classList.remove('active'); 
+        document.body.style.overflow = ''; // Restore background scrolling
+    }
+    
+    function navFromMenu(pageId) { closeMenu(); openPage(pageId); }
+    
+    function toggleTheme() {
+        isDarkMode = !isDarkMode;
+        if(isDarkMode) {
+            document.body.classList.add('dark-mode');
+            localStorage.setItem('neet_theme', 'dark');
+        } else {
+            document.body.classList.remove('dark-mode');
+            localStorage.setItem('neet_theme', 'light');
+        }
+        updateThemeUI();
+    }
+
+    function updateThemeUI() {
+        document.getElementById('theme-icon').innerText = isDarkMode ? '☀️' : '🌙';
+        document.getElementById('theme-text').innerText = isDarkMode ? 'Light Mode' : 'Dark Mode';
+    }
+
+    function forceUpdateApp() {
+        // Appends a timestamp parameter to force the browser to ignore cache and fetch the newest HTML
+        window.location.href = window.location.href.split('?')[0] + '?force_update=' + new Date().getTime();
+    }
+
+    function resetApp() {
+        if(confirm("⚠️ DANGER: Are you absolutely sure you want to wipe ALL your data? This cannot be undone!")) {
+            if(confirm("Final confirmation. Wipe everything?")) {
+                localStorage.removeItem('neet_2027_v14');
+                window.location.reload();
+            }
+        }
+    }
+
+    // --- CORE LOGIC ---
+    function saveData() {
+        localStorage.setItem('neet_2027_v14', JSON.stringify({ scheduled, streak, lastActive, customSeq, revisionLogs, chapterCompletion, lastSelectedChapter }));
+        refreshActiveViews();
+    }
+
+    function refreshActiveViews() {
+        if (document.getElementById('dashboard').classList.contains('active')) {
+            updateRings();
+            renderDashSchedule();
+            renderRevisions();
+        }
+        if (document.getElementById('full-schedule-page').classList.contains('active')) renderFullSchedule();
+        if (document.getElementById('chapter-hub-page').classList.contains('active')) renderChapterHub();
+        if (document.getElementById('priority-hub-page').classList.contains('active')) {
+            renderSequenceEditor(currentEditSub);
+        }
+        if (document.getElementById('revision-hub-page').classList.contains('active')) renderRevisions();
+
+        SUBJECTS.forEach(sub => {
+            if (document.getElementById(`${sub}-page`).classList.contains('active')) renderSubjectPage(sub);
+        });
+    }
+
+    function getTodayStr() {
+        const d = new Date();
+        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+        return d.toISOString().split('T')[0];
+    }
+
+    function formatDateFriendly(dateStr) {
+        if(!dateStr) return '';
+        const options = { weekday: 'short', day: 'numeric', month: 'short' };
+        return new Date(dateStr).toLocaleDateString('en-US', options);
+    }
+    
+    function addDaysToDate(dateStr, days) {
+        let d = new Date(dateStr);
+        d.setDate(d.getDate() + days);
+        return d.toISOString().split('T')[0];
+    }
+
+    function sortTasksByDate(tasks) {
+        return tasks.sort((a,b) => new Date(a.date) - new Date(b.date));
+    }
+
+    function handleStreak(isActionDone) {
+        const today = getTodayStr();
+        const yesterday = new Date();
+        yesterday.setMinutes(yesterday.getMinutes() - yesterday.getTimezoneOffset());
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+        if (isActionDone) {
+            if (lastActive !== today) {
+                streak = (lastActive === yesterdayStr) ? streak + 1 : 1;
+                lastActive = today;
+            }
+        } else {
+            if (lastActive !== today && lastActive !== yesterdayStr && lastActive !== "") streak = 0;
+        }
+        document.getElementById('streak-val').innerText = streak;
+    }
+
+    function triggerConfetti() {
+        if(window.confetti) confetti({ particleCount: 150, spread: 80, origin:{y:0.6}, colors:['#00b894', '#0984e3', '#d35400', '#e84393', '#f39c12'] });
+    }
+
+    function updateRings() {
+        const today = getTodayStr();
+        SUBJECTS.forEach(sub => {
+            let totalSyllabus = customSeq[sub].length;
+            let uniqueCompletedChaps = new Set(Object.keys(chapterCompletion[sub]));
+            let subCompleted = uniqueCompletedChaps.size;
+            let todayTotal = 0; let todayCompleted = 0;
+
+            scheduled[sub].forEach(t => {
+                if(t.date === today) {
+                    todayTotal++;
+                    if(t.done) todayCompleted++;
+                }
+            });
+
+            const overallPct = totalSyllabus > 0 ? (subCompleted / totalSyllabus) : 0;
+            const innerOffset = 251.3 * (1 - overallPct);
+            document.getElementById(`${sub}Inner`).style.strokeDashoffset = innerOffset;
+            
+            const todayPct = todayTotal > 0 ? (todayCompleted / todayTotal) : 0;
+            const outerOffset = 326.7 * (1 - todayPct);
+            document.getElementById(`${sub}Outer`).style.strokeDashoffset = outerOffset;
+
+            document.getElementById(`${sub}Pct`).innerText = Math.round(overallPct * 100) + '%';
+        });
+    }
+
+    function getAllTasks() {
+        let all = [];
+        SUBJECTS.forEach(s => scheduled[s].forEach((t, idx) => all.push({...t, sub:s, realIdx: idx})));
+        return sortTasksByDate(all);
+    }
+
+    function generateTaskHTML(t, showDelete = false, showDate = false, showSubject = false) {
+        let check = `<div class="checkbox ${t.done?'checked':''}" onclick="toggleTask('${t.sub}', ${t.realIdx})"></div>`;
+        let title = t.lec ? `Lec ${t.lec}: ${t.chapter}` : t.chapter;
+        
+        return `
+        <div class="task-card ${t.sub} ${t.done?'done':''}">
+            <div style="display:flex; align-items:center; flex:1; min-width:0;">
+                ${check}
+                <div class="task-content">
+                    <div class="task-title" title="${title}">${title}</div>
+                    <div class="task-meta">
+                        ${showSubject ? `<span class="badge badge-${t.sub}">${t.sub.toUpperCase()}</span>` : ''}
+                        ${t.duration ? `<span class="badge badge-time">⏱ ${t.duration}</span>` : ''}
+                        ${showDate ? `<span class="badge badge-time" style="background:var(--${t.sub}); color:white; border:none;">📅 ${formatDateFriendly(t.date)}</span>` : ''}
+                    </div>
+                </div>
+            </div>
+            ${showDelete ? `<button class="btn-delete" onclick="delTask('${t.sub}', ${t.realIdx})">×</button>` : ''}
+        </div>`;
+    }
+
+    function renderDashSchedule() {
+        const el = document.getElementById('dash-schedule');
+        el.innerHTML = "";
+        const today = getTodayStr();
+        let todayTasks = getAllTasks().filter(t => t.date === today);
+
+        if(todayTasks.length === 0) {
+            el.innerHTML = "<div style='text-align:center; color:var(--text-sub); padding:10px; font-weight:900; font-size:0.85rem;'>No missions mapped for today.</div>";
+        } else {
+            todayTasks.forEach(t => { el.innerHTML += generateTaskHTML(t, false, false, true); });
+        }
+    }
+
+    function renderFullSchedule() {
+        const el = document.getElementById('full-schedule-list');
+        el.innerHTML = "";
+        let futureTasks = getAllTasks().filter(t => t.date >= getTodayStr());
+
+        if(futureTasks.length === 0) {
+            el.innerHTML = "<div style='text-align:center; color:var(--text-sub); padding:20px; font-weight:900;'>No future missions. Add some!</div>";
+            return;
+        }
+
+        let grouped = {};
+        futureTasks.forEach(t => {
+            if(!grouped[t.date]) grouped[t.date] = [];
+            grouped[t.date].push(t);
+        });
+
+        Object.keys(grouped).sort().forEach(dateStr => {
+            el.innerHTML += `<div class="date-header">📅 ${formatDateFriendly(dateStr)}</div>`;
+            grouped[dateStr].forEach(t => { el.innerHTML += generateTaskHTML(t, true, false, true); });
+        });
+    }
+
+    function renderRevisions() {
+        const elDue = document.getElementById('dash-rev-due');
+        const elUpcoming = document.getElementById('dash-rev-upcoming');
+        
+        if(elDue) elDue.innerHTML = ""; 
+        if(elUpcoming) elUpcoming.innerHTML = "";
+        
+        const today = getTodayStr();
+        let dueCount = 0; 
+        let upcomingGrouped = {};
+
+        SUBJECTS.forEach(sub => {
+            scheduled[sub].forEach((t, idx) => {
+                if(t.done && t.completedOn) {
+                    let title = t.lec ? `Lec ${t.lec}: ${t.chapter}` : t.chapter;
+                    [1, 3, 7].forEach(target => {
+                        let revDateStr = addDaysToDate(t.completedOn, target);
+                        let revKey = `lec_${sub}_${t.id || idx}_day${target}`;
+                        
+                        if(!revisionLogs[revKey]) {
+                            if(revDateStr <= today) {
+                                dueCount++;
+                                if(elDue) {
+                                    elDue.innerHTML += `
+                                        <div class="task-card rev">
+                                            <div class="task-content">
+                                                <div class="task-title" title="${title}">${title}</div>
+                                                <div class="task-meta">
+                                                    <span class="badge badge-rev-lec">DAY ${target} REV</span>
+                                                    <span class="badge badge-${sub}">${sub.toUpperCase()}</span>
+                                                </div>
+                                            </div>
+                                            <button class="btn-done-rev" onclick="markRevDone('${revKey}')">DONE</button>
+                                        </div>`;
+                                }
+                            } else {
+                                if(!upcomingGrouped[revDateStr]) upcomingGrouped[revDateStr] = [];
+                                upcomingGrouped[revDateStr].push({ title: title, type: `Day ${target} Rev`, class: 'badge-rev-lec', sub: sub });
+                            }
+                        }
+                    });
+                }
+            });
+
+            for (const [chapName, compDate] of Object.entries(chapterCompletion[sub])) {
+                let dCompleted = new Date(compDate);
+                let dToday = new Date(today);
+                let diffDays = Math.floor((dToday - dCompleted) / (1000 * 60 * 60 * 24));
+                let currentCycle = Math.floor(diffDays / 30);
+                
+                if(currentCycle >= 1) {
+                    for(let c = 1; c <= currentCycle; c++) {
+                        let revKey = `chap_${sub}_${chapName}_cycle${c}`;
+                        if(!revisionLogs[revKey]) {
+                            dueCount++;
+                            if(elDue) {
+                                elDue.innerHTML += `
+                                    <div class="task-card rev" style="border-left-color: var(--danger);">
+                                        <div class="task-content">
+                                            <div class="task-title" title="${chapName}">${chapName}</div>
+                                            <div class="task-meta">
+                                                <span class="badge badge-rev-sub">MONTH ${c} CYCLE</span>
+                                                <span class="badge badge-${sub}">${sub.toUpperCase()}</span>
+                                            </div>
+                                        </div>
+                                        <button class="btn-done-rev" style="color:var(--danger);" onclick="markRevDone('${revKey}')">DONE</button>
+                                    </div>`;
+                            }
+                        }
+                    }
+                }
+                
+                let nextCycle = currentCycle + 1;
+                let nextDateStr = addDaysToDate(compDate, nextCycle * 30);
+                if(!upcomingGrouped[nextDateStr]) upcomingGrouped[nextDateStr] = [];
+                upcomingGrouped[nextDateStr].push({ title: chapName, type: `Month ${nextCycle}`, class: 'badge-rev-sub', sub: sub });
+            }
+        });
+
+        if(elDue && dueCount === 0) elDue.innerHTML = "<div style='color:var(--text-sub); font-size:0.85rem; font-weight:900; padding: 10px 5px;'>✓ 100% caught up! Nothing due right now.</div>";
+        
+        if(elUpcoming) {
+            let sortedDates = Object.keys(upcomingGrouped).sort();
+            if(sortedDates.length === 0) {
+                elUpcoming.innerHTML = "<div style='color:var(--text-sub); font-size:0.85rem; font-weight:900; padding: 10px 5px;'>Pipeline is empty. Log tasks to see upcoming revisions.</div>";
+            } else {
+                sortedDates.forEach(dateStr => { 
+                    let html = `<details class="pipeline-group">
+                                  <summary class="pipeline-date">
+                                    <span>📅 ${formatDateFriendly(dateStr)}</span>
+                                    <span class="chevron">▼</span>
+                                  </summary>
+                                  <div class="pipeline-list">`;
+                    upcomingGrouped[dateStr].forEach(item => {
+                        html += `
+                            <div class="task-card" style="padding:12px 16px; margin-bottom:0; border-left-color:var(--rev);">
+                                <div class="task-content">
+                                    <div class="task-title" style="font-size:0.9rem;">${item.title}</div>
+                                    <div class="task-meta">
+                                        <span class="badge ${item.class}">${item.type}</span>
+                                        <span class="badge badge-${item.sub}">${item.sub}</span>
+                                    </div>
+                                </div>
+                            </div>`;
+                    });
+                    html += `</div></details>`;
+                    elUpcoming.innerHTML += html;
+                });
+            }
+        }
+    }
+
+    function markRevDone(key) { revisionLogs[key] = true; triggerConfetti(); saveData(); }
+
+    function updateLogChapSelect() {
+        const sub = document.getElementById('log-sub-select').value;
+        const sel = document.getElementById('log-chap-select');
+        sel.innerHTML = '';
+        customSeq[sub].sort((a,b) => a.order - b.order).forEach(c => {
+            if(!chapterCompletion[sub][c.name]) sel.add(new Option(`${c.order}. ${c.name}`, c.name));
+        });
+        document.getElementById('log-date-input').value = getTodayStr();
+    }
+
+    function logChapterCompletion() {
+        const sub = document.getElementById('log-sub-select').value;
+        const chap = document.getElementById('log-chap-select').value;
+        const date = document.getElementById('log-date-input').value;
+        if(!chap || !date) return alert("Select chapter and date.");
+        
+        chapterCompletion[sub][chap] = date;
+        if(lastSelectedChapter[sub] === chap) lastSelectedChapter[sub] = "";
+        
+        handleStreak(true); updateLogChapSelect(); triggerConfetti(); saveData();
+    }
+
+    function deleteChapterLog(sub, chapName) {
+        let safeChapName = chapName.replace(/'/g, "\\'");
+        if(!confirm(`Remove ${safeChapName} from Completed Log? This stops its 30-day revision cycles.`)) return;
+        delete chapterCompletion[sub][chapName];
+        Object.keys(revisionLogs).forEach(k => { if(k.startsWith(`chap_${sub}_${chapName}_`)) delete revisionLogs[k]; });
+        saveData();
+    }
+
+    function renderChapterHub() {
+        const elLog = document.getElementById('comp-log-list');
+        elLog.innerHTML = "";
+        let hasLogs = false;
+        SUBJECTS.forEach(sub => {
+            for (const [chapName, compDate] of Object.entries(chapterCompletion[sub])) {
+                hasLogs = true;
+                let safeChapName = chapName.replace(/'/g, "\\'");
+                elLog.innerHTML += `
+                    <div class="task-card comp">
+                        <div class="task-content">
+                            <div class="task-title" title="${chapName}">${chapName}</div>
+                            <div class="task-meta">
+                                <span class="badge badge-comp">DONE: ${compDate}</span>
+                                <span class="badge badge-${sub}">${sub.toUpperCase()}</span>
+                            </div>
+                        </div>
+                        <button class="btn-delete" onclick="deleteChapterLog('${sub}', '${safeChapName}')">×</button>
+                    </div>`;
+            }
+        });
+        if(!hasLogs) elLog.innerHTML = "<div style='color:var(--text-sub); font-size:0.85rem; font-weight:900; padding: 10px 5px;'>No chapters fully logged yet. Get to work!</div>";
+    }
+
+    function handleSequenceShift(sub, oldIdx, newVal) {
+        let newOrder = parseInt(newVal);
+        if(isNaN(newOrder) || newOrder < 1) newOrder = 1;
+        if(newOrder > customSeq[sub].length) newOrder = customSeq[sub].length;
+        let newIdx = newOrder - 1;
+        if (oldIdx === newIdx) return;
+        
+        let item = customSeq[sub].splice(oldIdx, 1)[0];
+        customSeq[sub].splice(newIdx, 0, item);
+        customSeq[sub].forEach((c, idx) => c.order = idx + 1);
+        renderSequenceEditor(sub);
+    }
+
+    function renderSequenceEditor(sub) {
+        currentEditSub = sub;
+        
+        SUBJECTS.forEach(s => {
+            let btn = document.getElementById(`btn-seq-${s}`);
+            btn.className = `tab-btn ${s} ${s === sub ? 'active' : ''}`;
+        });
+
+        const el = document.getElementById('seq-list-container');
+        el.innerHTML = "";
+        customSeq[sub].sort((a,b) => a.order - b.order).forEach((c, idx) => {
+            el.innerHTML += `
+                <div class="seq-row">
+                    <input type="number" id="seq-input-${idx}" value="${c.order}" min="1" max="${customSeq[sub].length}" onchange="handleSequenceShift('${sub}', ${idx}, this.value)">
+                    <span style="font-weight:900; font-size:0.95rem;">${c.name}</span>
+                </div>`;
+        });
+    }
+
+    function saveSequence() { saveData(); alert("Sequence Saved Successfully!"); }
+
+    // DYNAMIC LECTURE PREVIOUS DATE HINT
+    function updatePrevHint(sub, chap) {
+        const hintEl = document.getElementById(`${sub}-prev-hint`);
+        if (!chap) { hintEl.innerText = ""; return; }
+        
+        let tasks = scheduled[sub].filter(t => t.chapter === chap);
+        if (tasks.length === 0) {
+            hintEl.innerText = "No previous missions scheduled for this chapter.";
+            document.getElementById(`${sub}-lec`).value = "1"; // Auto-fill 1st lec
+        } else {
+            // Sort to find the most recent based on date
+            tasks.sort((a,b) => new Date(b.date) - new Date(a.date));
+            let last = tasks[0];
+            let lecStr = last.lec ? `Lec ${last.lec}` : `Task`;
+            hintEl.innerText = `⏳ Last Scheduled: ${lecStr} on ${formatDateFriendly(last.date)}`;
+            
+            // Auto-fill next sequential lecture number
+            if(last.lec && !isNaN(last.lec)) {
+                document.getElementById(`${sub}-lec`).value = parseInt(last.lec) + 1;
+            }
+        }
+    }
+
+    function updateLastSelected(sub, val) { 
+        lastSelectedChapter[sub] = val; 
+        saveData(); 
+        updatePrevHint(sub, val); 
+    }
+
+    function renderSubjectPage(sub) {
+        const sel = document.getElementById(`${sub}-select`);
+        customSeq[sub].sort((a,b) => a.order - b.order);
+        sel.innerHTML = '<option value="">Select Chapter...</option>';
+        customSeq[sub].forEach(c => { if(!chapterCompletion[sub][c.name]) sel.add(new Option(`${c.order}. ${c.name}`, c.name)); });
+        
+        if(lastSelectedChapter[sub]) {
+            sel.value = lastSelectedChapter[sub];
+            if(!sel.value) lastSelectedChapter[sub] = ""; 
+        }
+        
+        updatePrevHint(sub, sel.value); // Show hint on load
+
+        const list = document.getElementById(`${sub}-list`);
+        list.innerHTML = "";
+        let subTasks = sortTasksByDate( scheduled[sub].map((t, i) => ({...t, sub: sub, realIdx: i})) );
+        let groupedByChap = {};
+        subTasks.forEach(t => {
+            if(!groupedByChap[t.chapter]) groupedByChap[t.chapter] = [];
+            groupedByChap[t.chapter].push(t);
+        });
+
+        let sortedGroups = Object.entries(groupedByChap).map(([chapName, tasks]) => {
+            let dates = tasks.map(t => t.date).sort();
+            return { chapName, tasks, startDate: dates[0], endDate: dates[dates.length - 1] };
+        }).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+        sortedGroups.forEach(group => {
+            let chapName = group.chapName;
+            let tasks = group.tasks;
+            let startDate = group.startDate;
+            let endDate = group.endDate;
+            let dateRangeStr = startDate === endDate ? formatDateFriendly(startDate) : `${formatDateFriendly(startDate)} — ${formatDateFriendly(endDate)}`;
+
+            let html = `
+            <details class="pipeline-group">
+                <summary class="pipeline-date" style="border-left: 4px solid var(--${sub}); padding: 15px 20px;">
+                    <div style="text-align: left;">
+                        <div style="font-size:1.05rem; font-weight:900; color:var(--${sub});">${chapName}</div>
+                        <div style="font-size:0.75rem; color:var(--text-sub); margin-top:4px;">🗓 Timeline: ${dateRangeStr}</div>
+                    </div>
+                    <span class="chevron">▼</span>
+                </summary>
+                <div class="pipeline-list">
+            `;
+            tasks.forEach(t => { html += generateTaskHTML(t, true, true, false); });
+            html += `</div></details>`;
+            list.innerHTML += html;
+        });
+        
+        if(sortedGroups.length === 0) list.innerHTML = "<div style='color:var(--text-sub); font-size:0.85rem; font-weight:900; padding: 10px 5px;'>No missions planned yet.</div>";
+    }
+
+    function addTask(sub) {
+        const c = document.getElementById(`${sub}-select`).value;
+        const d = document.getElementById(`${sub}-date`).value;
+        const lec = document.getElementById(`${sub}-lec`).value;
+        const hr = document.getElementById(`${sub}-hr`).value || "0";
+        const min = document.getElementById(`${sub}-min`).value || "00";
+        let durationStr = "";
+        if(hr !== "0" || min !== "00") durationStr = `${hr.padStart(2,'0')}h ${min.padStart(2,'0')}m`;
+
+        if(!c || !d) return alert("Please select a chapter and date.");
+
+        scheduled[sub].push({
+            id: Date.now() + Math.floor(Math.random() * 1000), 
+            chapter:c, lec:lec, duration:durationStr, date:d, done:false, completedOn: null
+        });
+        lastSelectedChapter[sub] = c;
+        saveData(); 
+        
+        document.getElementById(`${sub}-date`).value = "";
+        // Intentionally NOT clearing the lecture number, because updatePrevHint will now auto-calculate the NEXT one!
+        document.getElementById(`${sub}-hr`).value = "";
+        document.getElementById(`${sub}-min`).value = "";
+    }
+
+    function toggleTask(sub, i) {
+        const task = scheduled[sub][i];
+        task.done = !task.done;
+        if(task.done) { 
+            task.completedOn = getTodayStr(); 
+            handleStreak(true); 
+            triggerConfetti(); 
+        } else {
+            task.completedOn = null;
+        }
+        saveData(); 
+    }
+
+    function delTask(sub, i) { scheduled[sub].splice(i,1); saveData(); }
+
+    function goHome() { openPage('dashboard'); }
+    function openPage(id) {
+        document.querySelectorAll('.page-view').forEach(e => e.classList.remove('active'));
+        let targetId = id === 'dashboard' || id.includes('-page') ? id : id + '-page';
+        document.getElementById(targetId).classList.add('active');
+        refreshActiveViews();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    setInterval(() => {
+        const diff = TARGET_DATE - new Date();
+        if(diff < 0) return;
+        document.getElementById('d').innerText = Math.floor(diff/(1000*60*60*24));
+        document.getElementById('h').innerText = Math.floor((diff%(1000*60*60*24))/(1000*60*60)).toString().padStart(2, '0');
+        document.getElementById('m').innerText = Math.floor((diff%(1000*60*60))/(1000*60)).toString().padStart(2, '0');
+        document.getElementById('s').innerText = Math.floor((diff%(1000*60))/1000).toString().padStart(2, '0');
+    }, 1000);
+
+</script>
+</body>
+</html>

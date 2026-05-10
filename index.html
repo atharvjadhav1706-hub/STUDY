@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEET 2027 V16.5 - OLED Pro Engine</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        :root {
+            /* Premium Light Theme */
+            --bg-color: #f2f2f7;
+            --text-main: #1c1c1e; 
+            --text-sub: #8e8e93;  
+            --glass-base: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(0, 0, 0, 0.05);
+            --card-bg: rgba(255, 255, 255, 1);
+            --input-bg: #f2f2f7;
+            --check-bg: #ffffff;
+            --color-scheme: light;
+            
+            /* Vibrant Apple Palette */
+            --phy: #007aff;        
+            --chem: #ff9500;       
+            --bio: #ff2d55;        
+            --mission: #34c759;    
+            --rev: #5856d6;        
+            --prio: #32ade6;       
+            --comp: #ffcc00;       
+            --sched: #8e8e93;      
+            
+            --success: #34c759;
+            --danger: #ff3b30;
+            --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, sans-serif;
+        }
+
+        body.dark-mode {
+            /* True OLED Pure Black Theme */
+            --bg-color: #000000;
+            --text-main: #ffffff; 
+            --text-sub: #a1a1a6;  
+            --glass-base: rgba(28, 28, 30, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --card-bg: #121212;
+            --input-bg: #1c1c1e;
+            --check-bg: #1c1c1e;
+            --color-scheme: dark;
+            
+            --phy: #0a84ff;        
+            --chem: #ff9f0a;       
+            --bio: #ff375f;        
+            --mission: #32d74b;    
+            --rev: #5e5ce6;
+            --comp: #ffd60a; 
+        }
+
+        * { box-sizing: border-box; font-family: var(--font-stack); -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+
+        body {
+            padding: 20px; padding-bottom: 40px; /* FIXED HUGE BOTTOM SPACE */
+            background-color: var(--bg-color);
+            background-image: none !important; 
+            background-attachment: fixed; color: var(--text-main);
+            min-height: 100vh; transition: background-color 0.4s ease, color 0.4s ease;
+            color-scheme: var(--color-scheme);
+        }
+
+        body.modal-open { overflow: hidden; }
+
+        .container { max-width: 600px; margin: 0 auto; }
+
+        /* --- HEADER --- */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        .app-title { font-size: 1.6rem; font-weight: 900; letter-spacing: -0.5px; text-transform: uppercase; margin: 0; }
+        .header-actions { display: flex; align-items: center; gap: 12px; }
+        .streak-pill { 
+            background: var(--card-bg); border: 1px solid var(--glass-border);
+            color: var(--chem); padding: 8px 16px; border-radius: 20px; font-weight: 800; font-size: 0.9rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        }
+        .menu-btn {
+            background: var(--card-bg); border: 1px solid var(--glass-border);
+            color: var(--text-main); font-size: 1.2rem; width: 44px; height: 44px; border-radius: 14px;
+            cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.06); transition: 0.2s; display: grid; place-items: center;
+        }
+        .menu-btn:active { transform: scale(0.9); }
+
+        /* --- PRO SIDE MENU --- */
+        .side-menu-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .side-menu-overlay.active { opacity: 1; pointer-events: all; }
+        
+        .side-menu {
+            position: absolute; top: 0; right: 0; width: 280px; height: 100%;
+            background: var(--bg-color); box-shadow: -10px 0 40px rgba(0,0,0,0.4);
+            transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); 
+            padding: 30px 20px 50px 20px; display: flex; flex-direction: column; gap: 10px; 
+            border-left: 1px solid var(--glass-border); overflow-y: auto; overscroll-behavior-y: contain;
+        }
+        .side-menu-overlay.active .side-menu { transform: translateX(0); }
+        
+        .menu-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px;}
+        .menu-header h2 { font-weight: 800; color: var(--text-sub); font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase;}
+        .menu-close { background: none; border: none; font-size: 1.8rem; color: var(--text-sub); cursor: pointer; }
+        
+        .menu-item {
+            display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px;
+            font-weight: 700; font-size: 0.95rem; color: var(--text-main); cursor: pointer; background: var(--card-bg);
+            border: 1px solid var(--glass-border); transition: 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.02); flex-shrink: 0;
+        }
+        .menu-item:active { transform: scale(0.96); }
+
+        /* Switch Toggle */
+        .toggle-track { width: 44px; height: 24px; background: #e5e5ea; border-radius: 12px; position: relative; border: 1px solid var(--glass-border); pointer-events: none;}
+        .toggle-thumb { width: 18px; height: 18px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 3px; transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        body.dark-mode .toggle-track { background: var(--success); border-color: var(--success); }
+        body.dark-mode .toggle-thumb { left: 21px; }
+
+        /* --- GLASSMORPHISM --- */
+        .glass-box {
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border); border-radius: 20px; padding: 22px; margin-bottom: 20px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05); transition: 0.3s; background: var(--card-bg);
+        }
+        
+        .glass-mission { border-left: 4px solid var(--mission); }
+        .glass-phy { border-left: 4px solid var(--phy); }
+        .glass-chem { border-left: 4px solid var(--chem); }
+        .glass-bio { border-left: 4px solid var(--bio); }
+        .glass-prio { border-left: 4px solid var(--prio); }
+        .glass-rev { border-left: 4px solid var(--rev); }
+        .glass-comp { border-left: 4px solid var(--comp); }
+        .glass-sched { border-left: 4px solid var(--sched); }
+
+        .box-title { font-size: 0.85rem; font-weight: 800; color: var(--text-sub); text-transform: uppercase; margin-bottom: 15px; letter-spacing: 1px; }
+
+        /* Expanding Planner Toggle */
+        .planner-toggle { 
+            background: var(--phy); color: white; padding: 16px; 
+            text-align: center; border-radius: 16px; font-weight: 800; cursor: pointer; 
+            margin-bottom: 25px; transition: 0.2s; font-size: 0.95rem; letter-spacing: 0.5px;
+            box-shadow: 0 8px 20px rgba(0, 122, 255, 0.2);
+        }
+        .planner-toggle.chem { background: var(--chem); box-shadow: 0 8px 20px rgba(255, 149, 0, 0.2);}
+        .planner-toggle.bio { background: var(--bio); box-shadow: 0 8px 20px rgba(255, 45, 85, 0.2);}
+        .planner-toggle:active { transform: scale(0.97); filter: brightness(0.9); }
+        
+        .planner-box { display: none; margin-top: 10px; }
+        
+        .planner-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .close-btn { 
+            width: 32px; height: 32px; background: var(--input-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+            font-weight: 900; font-size: 1.1rem; cursor: pointer; color: var(--text-main); 
+            transition: 0.2s; border: 1px solid var(--glass-border); box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .close-btn:active { transform: scale(0.9); background: var(--danger); color: white; border-color: var(--danger); }
+
+        /* --- MASTER PROGRESS BAR (ANIMATED GRADIENT) --- */
+        .master-prog-bar { 
+            width: 100%; height: 16px; background: var(--input-bg); border-radius: 10px; 
+            overflow: hidden; border: 1px solid var(--glass-border); position: relative; 
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        @keyframes gradientMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .master-prog-fill { 
+            height: 100%; border-radius: 10px;
+            background: linear-gradient(270deg, var(--phy), var(--bio), var(--chem), var(--mission), var(--phy));
+            background-size: 300% 300%;
+            animation: gradientMove 4s ease infinite;
+            transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); 
+        }
+
+        /* --- COUNTDOWN --- */
+        .countdown {
+            background: linear-gradient(135deg, #5e5ce6, #5856d6);
+            border-radius: 20px; padding: 22px; margin-bottom: 20px;
+            text-align: center; color: white; box-shadow: 0 10px 30px -10px rgba(88, 86, 214, 0.4);
+        }
+        .timer-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
+        .t-box { background: rgba(0, 0, 0, 0.15); padding: 12px 4px; border-radius: 14px; }
+        .t-val { font-size: 1.5rem; font-weight: 800; display: block; line-height: 1.1; }
+        .t-lbl { font-size: 0.6rem; color: rgba(255,255,255,0.8); font-weight: 800; letter-spacing: 0.5px; margin-top: 3px; }
+
+        /* --- SINGLE RINGS --- */
+        .single-ring-wrap { position: relative; width: 70px; height: 70px; flex-shrink: 0; }
+        .single-ring-wrap svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+        .ring-bg { fill: none; stroke: var(--input-bg); stroke-width: 6; }
+        .ring-inner { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1s ease-out; }
+        .hero-ring-center { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+        .ring-pct { font-size: 0.9rem; font-weight: 800; color: var(--text-main); }
+
+        /* --- PCB GRID --- */
+        .pcb-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 20px; }
+        .subject-card { border-radius: 20px; padding: 20px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .subject-card:active { transform: scale(0.98); }
+        .sub-info { display: flex; align-items: center; gap: 15px; }
+        .sub-icon { font-size: 2.2rem; }
+        .sub-title { font-weight: 800; font-size: 1.3rem; color: var(--text-main); }
+
+        /* --- TASK CARDS --- */
+        .task-card {
+            background: var(--card-bg); border-radius: 14px; padding: 14px; margin-bottom: 8px;
+            display: flex; align-items: center; justify-content: space-between;
+            border: 1px solid var(--glass-border); box-shadow: 0 2px 8px rgba(0,0,0,0.03); color: var(--text-main);
+        }
+        .task-card.phy { border-left: 3px solid var(--phy); }
+        .task-card.chem { border-left: 3px solid var(--chem); }
+        .task-card.bio { border-left: 3px solid var(--bio); }
+        .task-card.rev { border-left: 3px solid var(--rev); }
+        .task-card.comp { border-left: 3px solid var(--comp); }
+
+        .task-card.done { opacity: 0.5; background: var(--input-bg); }
+        .task-card.done .task-title { text-decoration: line-through; color: var(--text-sub); }
+
+        .checkbox {
+            width: 24px; height: 24px; border: 2px solid var(--text-sub); border-radius: 6px;
+            cursor: pointer; display: grid; place-items: center; flex-shrink: 0; margin-right: 12px; background: var(--check-bg); transition: 0.2s;
+        }
+        .checkbox.checked { background: var(--success); border-color: var(--success); }
+        .checkbox.checked::after { content: '✓'; color: white; font-weight: 900; font-size: 12px; }
+
+        .task-content { flex: 1; min-width: 0; }
+        .task-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3;}
+        .task-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        
+        .badge { font-size: 0.55rem; font-weight: 800; padding: 4px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .badge-phy { background: rgba(0, 122, 255, 0.1); color: var(--phy); }
+        .badge-chem { background: rgba(255, 149, 0, 0.1); color: var(--chem); }
+        .badge-bio { background: rgba(255, 45, 85, 0.1); color: var(--bio); }
+        .badge-time { background: var(--input-bg); color: var(--text-sub); border: 1px solid var(--glass-border);}
+        .badge-rev-lec { background: rgba(88, 86, 214, 0.1); color: var(--rev); }
+        .badge-rev-sub { background: rgba(255, 59, 48, 0.1); color: var(--danger); }
+        .badge-comp { background: rgba(243, 156, 18, 0.1); color: var(--comp); }
+
+        .date-header { font-size: 0.8rem; font-weight: 800; color: var(--text-sub); text-transform: uppercase; margin: 20px 0 8px 4px; letter-spacing: 1px; }
+        
+        .btn-act { 
+            width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--glass-border); 
+            background: var(--card-bg); display: flex; align-items: center; justify-content: center; 
+            font-size: 1rem; font-weight: 900; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+        }
+        .btn-act.del { color: var(--danger); }
+        .btn-act.shift { color: var(--phy); }
+        .btn-act.edit { color: var(--comp); font-size: 0.9rem;}
+        .btn-act:active { transform: scale(0.9); filter: brightness(0.9); }
+
+        .btn-done-rev { border: 1px solid var(--glass-border); background: var(--card-bg); padding: 10px 14px; border-radius: 10px; font-weight: 800; cursor: pointer; color: var(--rev); font-size: 0.8rem; box-shadow: 0 2px 6px rgba(0,0,0,0.02);}
+
+        /* --- SMART ACCORDION --- */
+        details.pipeline-group { margin-bottom: 12px; background: var(--card-bg); border: 1px solid var(--glass-border); border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+        summary.pipeline-date { font-weight: 800; font-size: 0.9rem; padding: 16px 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; list-style: none; outline:none; }
+        summary.pipeline-date::-webkit-details-marker { display: none; }
+        .pipeline-list { padding: 0 20px 20px 20px; display: flex; flex-direction: column; gap: 6px; }
+
+        /* --- INPUTS & BUTTONS --- */
+        .input-label { font-size: 0.65rem; color: var(--text-sub); font-weight: 800; margin-bottom: 6px; display: block; letter-spacing: 0.5px; margin-top: 15px;}
+        select, input[type="text"], input[type="date"], input[type="number"] { 
+            width: 100%; padding: 14px 16px; background: var(--input-bg); border: 1px solid var(--glass-border); 
+            color: var(--text-main); border-radius: 12px; outline: none; font-size: 0.9rem; font-weight: 700; transition: 0.2s;
+        }
+        select:focus, input:focus { border-color: var(--phy); box-shadow: 0 0 0 2px rgba(0,122,255,0.2); }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        
+        /* Pace Selector */
+        .pace-selector { display: flex; background: var(--input-bg); border-radius: 12px; border: 1px solid var(--glass-border); padding: 4px; gap: 4px; }
+        .pace-btn { flex: 1; text-align: center; padding: 10px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; color: var(--text-sub); cursor: pointer; transition: 0.2s; }
+        .pace-btn.active { background: var(--card-bg); color: var(--text-main); box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+
+        .prev-hint { font-size: 0.75rem; color: var(--text-sub); font-weight: 600; margin-top: 6px; min-height: 14px; }
+
+        .action-btn { 
+            width: 100%; padding: 16px; color: white; font-weight: 800; border: none; border-radius: 14px; 
+            cursor: pointer; font-size: 0.9rem; text-transform: uppercase; margin-top: 25px; transition: 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .action-btn:active { transform: scale(0.98); }
+
+        /* --- NAV & MODALS --- */
+        .page-view { display: none; animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .page-view.active { display: block; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .inline-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; transition: 0.3s; }
+        .back-arrow { 
+            display: flex; align-items: center; justify-content: center; 
+            width: 40px; height: 40px; border-radius: 50%; cursor: pointer; 
+            background: var(--card-bg); border: 1px solid var(--glass-border); 
+            color: var(--text-main); font-size: 1.4rem; font-weight: 900; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            line-height: 0; padding-bottom: 3px; /* Perfect vertical centering */
+        }
+        .back-arrow:active { transform: scale(0.9); }
+        .engine-title { font-size: 1.4rem; font-weight: 900; margin: 0; }
+        
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 10000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: 0.3s; }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        .modal-content { background: var(--bg-color); width: 92%; max-width: 450px; border-radius: 24px; padding: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); border: 1px solid var(--glass-border); }
+
+        /* Scrollable area inside modals to prevent cutting off buttons */
+        .modal-scroll-area { max-height: 50vh; overflow-y: auto; padding-right: 5px; margin-bottom: 15px; overscroll-behavior-y: contain; }
+        .modal-scroll-area::-webkit-scrollbar { width: 4px; }
+        .modal-scroll-area::-webkit-scrollbar-thumb { background: var(--text-sub); border-radius: 4px; }
+
+        .tab-btn { flex: 1; padding: 12px; font-weight: 800; border: 1px solid var(--glass-border); background: var(--card-bg); border-radius: 12px; cursor: pointer; color: var(--text-sub); font-size:0.8rem; text-transform: uppercase;}
+        .tab-btn.phy.active { background: var(--phy) !important; color: white !important; border-color: var(--phy) !important;}
+        .tab-btn.chem.active { background: var(--chem) !important; color: white !important; border-color: var(--chem) !important;}
+        .tab-btn.bio.active { background: var(--bio) !important; color: white !important; border-color: var(--bio) !important;}
+        
+        .seq-row { display: flex; align-items: center; margin-bottom: 8px; background: var(--card-bg); padding: 8px 12px; border-radius: 12px; border: 1px solid var(--glass-border);}
+        .seq-row input { width: 50px; margin-bottom: 0; margin-right: 12px; text-align: center; padding: 8px;}
+
+        .svg-defs { width: 0; height: 0; position: absolute; }
+    </style>
+</head>
+<body>
+
+<svg class="svg-defs">
+  <defs>
+    <linearGradient id="gradPhyInner" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#007aff"/><stop offset="100%" stop-color="#5ac8fa"/></linearGradient>
+    <linearGradient id="gradChemInner" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#ff9500"/><stop offset="100%" stop-color="#ffcc00"/></linearGradient>
+    <linearGradient id="gradBioInner" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#ff2d55"/><stop offset="100%" stop-color="#ff375f"/></linearGradient>
+  </defs>
+</svg>
+
+<div class="side-menu-overlay" id="mainMenu" onclick="closeMenu()">
+    <div class="side-menu" onclick="event.stopPropagation()">
+        <div class="menu-header">
+            <h2>SETTINGS</h2>
+            <button class="menu-close" onclick="closeMenu()">×</button>
+        </div>
+        
+        <div class="menu-item" onclick="toggleTheme()" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="menu-icon" id="theme-icon">🌙</span> 
+                <span id="theme-text">Dark Mode</span>
+            </div>
+            <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        </div>
+        
+        <div style="height: 1px; background: var(--glass-border); margin: 6px 0;"></div>
+
+        <div class="menu-item" onclick="navFromMenu('priority-hub')"><span class="menu-icon">📊</span> Sequence Hub</div>
+        <div class="menu-item" onclick="navFromMenu('chapter-hub')"><span class="menu-icon">🏆</span> Chapter Log</div>
+        <div class="menu-item" onclick="navFromMenu('full-schedule')"><span class="menu-icon">📅</span> Full Schedule</div>
+        <div class="menu-item" onclick="navFromMenu('revision-hub')"><span class="menu-icon">🧠</span> Revisions Due</div>
+        
+        <div style="flex-grow: 1; min-height: 20px;"></div>
+        
+        <div class="menu-item" style="background:var(--mission); color:white; border:none;" onclick="forceUpdateApp()">
+            <span class="menu-icon">🔄</span> Force Update
+        </div>
+        <div class="menu-item" style="color:var(--danger); border-color:var(--danger); background:rgba(255,59,48,0.05);" onclick="resetApp()">
+            <span class="menu-icon">⚠️</span> App Reset
+        </div>
+    </div>
+</div>
+
+<div id="scheduleModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="box-title">Confirm Plan</div>
+        <div id="modal-preview-list" class="modal-scroll-area" style="display:flex; flex-direction:column; gap:8px; color: var(--text-main);"></div>
+        <div class="grid-2">
+            <button class="action-btn" style="margin-top:0; background:var(--input-bg); color:var(--text-main); border:1px solid var(--glass-border); box-shadow:none;" onclick="closeModal()">CANCEL</button>
+            <button class="action-btn" style="margin-top:0; background: var(--success);" onclick="confirmSchedule()">CONFIRM</button>
+        </div>
+    </div>
+</div>
+
+<div id="chapterEditModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="box-title" id="edit-modal-title">Edit Chapter Plan</div>
+        <input type="hidden" id="edit-sub">
+        <input type="hidden" id="edit-chap-name">
+        <div id="chapter-edit-list" class="modal-scroll-area" style="display:flex; flex-direction:column; gap:10px;"></div>
+        
+        <button class="action-btn" style="margin-top:0; margin-bottom:12px; background:rgba(255,59,48,0.1); color:var(--danger); border:1px solid var(--danger); box-shadow:none;" onclick="clearChapterSchedule()">🗑 CLEAR ENTIRE SCHEDULE</button>
+        <button class="action-btn" style="margin-top:0; background:var(--comp); color:black;" onclick="closeChapterEditModal()">DONE EDITING</button>
+    </div>
+</div>
+
+<div class="container">
+
+    <div id="dashboard" class="page-view active">
+        <div class="header">
+            <h1 class="app-title">NEET 2027</h1>
+            <div class="header-actions">
+                <div class="streak-pill"><span id="streak-val">0</span> 🔥</div>
+                <button class="menu-btn" onclick="openMenu()">☰</button>
+            </div>
+        </div>
+
+        <div class="countdown">
+            <div style="font-size:0.7rem; font-weight:800; letter-spacing:2px; opacity:0.8; margin-bottom:8px;">TARGET: 2 MAY 2027</div>
+            <div class="timer-grid">
+                <div class="t-box"><span id="d" class="t-val">00</span><span class="t-lbl">DAYS</span></div>
+                <div class="t-box"><span id="h" class="t-val">00</span><span class="t-lbl">HRS</span></div>
+                <div class="t-box"><span id="m" class="t-val">00</span><span class="t-lbl">MIN</span></div>
+                <div class="t-box"><span id="s" class="t-val">00</span><span class="t-lbl">SEC</span></div>
+            </div>
+        </div>
+
+        <div class="glass-box" style="padding: 22px;">
+            <div class="box-title" style="margin-bottom: 12px; color: var(--text-main);">🎯 Today's Mission Progress</div>
+            <div style="display:flex; justify-content:space-between; font-size:0.85rem; font-weight:800; margin-bottom:10px;">
+                <span id="today-progress-text" style="color:var(--text-sub);">0 / 0 Completed</span>
+                <span id="today-progress-pct" style="color:var(--prio);">0%</span>
+            </div>
+            <div class="master-prog-bar">
+                <div class="master-prog-fill" id="today-progress-fill" style="width:0%;"></div>
+            </div>
+        </div>
+
+        <div class="glass-box glass-mission">
+            <div class="box-title">⚡ Scheduled Today</div>
+            <div id="dash-schedule"></div>
+            
+            <div class="box-title" style="margin-top:25px; border-top: 1px solid var(--glass-border); padding-top: 20px;">🚨 Revisions Due</div>
+            <div id="dash-rev-due"></div>
+        </div>
+
+        <div class="pcb-grid">
+            <div class="subject-card glass-box glass-phy" onclick="openPage('phy')" style="margin-bottom:0;">
+                <div class="sub-info"><div class="sub-icon">🌌</div><div class="sub-title">Physics</div></div>
+                <div class="single-ring-wrap">
+                    <svg viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="42" class="ring-bg"/>
+                        <circle id="phyInner" cx="50" cy="50" r="42" class="ring-inner" stroke="url(#gradPhyInner)" stroke-dasharray="263.89" stroke-dashoffset="263.89"/>
+                    </svg>
+                    <div class="hero-ring-center"><div id="phyPct" class="ring-pct">0%</div></div>
+                </div>
+            </div>
+
+            <div class="subject-card glass-box glass-chem" onclick="openPage('chem')" style="margin-bottom:0;">
+                <div class="sub-info"><div class="sub-icon">🧪</div><div class="sub-title">Chemistry</div></div>
+                <div class="single-ring-wrap">
+                    <svg viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="42" class="ring-bg"/>
+                        <circle id="chemInner" cx="50" cy="50" r="42" class="ring-inner" stroke="url(#gradChemInner)" stroke-dasharray="263.89" stroke-dashoffset="263.89"/>
+                    </svg>
+                    <div class="hero-ring-center"><div id="chemPct" class="ring-pct">0%</div></div>
+                </div>
+            </div>
+
+            <div class="subject-card glass-box glass-bio" onclick="openPage('bio')" style="margin-bottom:0;">
+                <div class="sub-info"><div class="sub-icon">🧬</div><div class="sub-title">Biology</div></div>
+                <div class="single-ring-wrap">
+                    <svg viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="42" class="ring-bg"/>
+                        <circle id="bioInner" cx="50" cy="50" r="42" class="ring-inner" stroke="url(#gradBioInner)" stroke-dasharray="263.89" stroke-dashoffset="263.89"/>
+                    </svg>
+                    <div class="hero-ring-center"><div id="bioPct" class="ring-pct">0%</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="priority-hub-page" class="page-view">
+        <div class="inline-header">
+            <div class="back-arrow" onclick="goHome()">←</div>
+            <h2 class="engine-title" style="color:var(--prio);">Sequence Hub</h2>
+        </div>
+        <div class="glass-box glass-prio">
+            <div style="display:flex; gap:8px; margin-bottom:20px;">
+                <button class="tab-btn phy active" id="btn-seq-phy" onclick="renderSequenceEditor('phy')">Physics</button>
+                <button class="tab-btn chem" id="btn-seq-chem" onclick="renderSequenceEditor('chem')">Chem</button>
+                <button class="tab-btn bio" id="btn-seq-bio" onclick="renderSequenceEditor('bio')">Biology</button>
+            </div>
+            <div id="seq-list-container"></div>
+            <button class="action-btn" style="background:var(--prio);" onclick="saveSequence()">SAVE SEQUENCE</button>
+        </div>
+    </div>
+
+    <div id="chapter-hub-page" class="page-view">
+        <div class="inline-header">
+            <div class="back-arrow" onclick="goHome()">←</div>
+            <h2 class="engine-title" style="color:var(--comp);">Chapter Log</h2>
+        </div>
+        <div class="glass-box glass-comp">
+            <p style="font-size:0.8rem; color:var(--text-sub); margin-bottom:15px; font-weight:600;">Marking complete triggers recurring 30-Day Revisions.</p>
+            <span class="input-label">SUBJECT</span>
+            <select id="log-sub-select" onchange="updateLogChapSelect()">
+                <option value="phy">Physics</option><option value="chem">Chemistry</option><option value="bio">Biology</option>
+            </select>
+            <span class="input-label">CHAPTER</span><select id="log-chap-select"></select>
+            <span class="input-label">COMPLETION DATE</span><input type="date" id="log-date-input">
+            <button class="action-btn" style="background: var(--comp); color:black;" onclick="logChapterCompletion()">LOG CHAPTER</button>
+        </div>
+        <div class="glass-box glass-comp">
+            <div class="box-title">📜 Logged Chapters</div>
+            <div id="comp-log-list"></div>
+        </div>
+    </div>
+
+    <div id="revision-hub-page" class="page-view">
+        <div class="inline-header">
+            <div class="back-arrow" onclick="goHome()">←</div>
+            <h2 class="engine-title" style="color:var(--rev);">Upcoming Revisions</h2>
+        </div>
+        <div class="glass-box glass-rev">
+            <p style="font-size:0.8rem; color:var(--text-sub); margin-bottom:20px; font-weight:600;">Tap a date folder to see scheduled revisions.</p>
+            <div id="dash-rev-upcoming"></div>
+        </div>
+    </div>
+
+    <div id="full-schedule-page" class="page-view">
+        <div class="inline-header">
+            <div class="back-arrow" onclick="goHome()">←</div>
+            <h2 class="engine-title" style="color:var(--sched);">Master Schedule</h2>
+        </div>
+        <div class="glass-box glass-sched">
+            <div id="full-schedule-list"></div>
+        </div>
+    </div>
+
+    <div id="phy-page" class="page-view">
+        <div id="phy-header" class="inline-header">
+            <div class="back-arrow" onclick="goHome()">←</div>
+            <h2 class="engine-title" style="color:var(--phy);">Physics Engine</h2>
+        </div>
+        
+        <div class="planner-toggle phy" id="phy-planner-btn" onclick="togglePlanner('phy')">➕ OPEN LECTURE PLANNER</div>
+        <div class="glass-box glass-phy planner-box" id="phy-planner-box">
+            
+            <div class="planner-header">
+                <div class="box-title" style="margin:0; color:var(--phy);">PLANNER DETAILS</div>
+                <div class="close-btn" onclick="togglePlanner('phy')">×</div>
+            </div>
+            
+            <span class="input-label" style="margin-top:0;">CHAPTER</span>
+            <select id="phy-select" onchange="updateLastSelected('phy', this.value)"></select>
+            <div id="phy-prev-hint" class="prev-hint"></div>
+
+            <div class="grid-2">
+                <div><span class="input-label">START LEC NO.</span><input type="number" id="phy-lec-start" placeholder="e.g. 1"></div>
+                <div><span class="input-label">TOTAL LECS</span><input type="number" id="phy-lec-count" placeholder="e.g. 5"></div>
+            </div>
+
+            <span class="input-label">PACE</span>
+            <div class="pace-selector">
+                <div class="pace-btn active" id="phy-p-1" onclick="setPace('phy', 1)">1 L/Day</div>
+                <div class="pace-btn" id="phy-p-2" onclick="setPace('phy', 2)">2 L/Day</div>
+                <div class="pace-btn" id="phy-p-3" onclick="setPace('phy', 3)">3 L/Day</div>
+            </div>
+            <input type="hidden" id="phy-pace" value="1">
+
+            <span class="input-label">DURATION (PER LEC)</span>
+            <div class="grid-2">
+                <div><input type="number" id="phy-hr" placeholder="HR" min="0"></div>
+                <div><input type="number" id="phy-min" placeholder="MIN" min="0" max="59"></div>
+            </div>
+            
+            <span class="input-label">START DATE</span><input type="date" id="phy-date">
+            <button class="action-btn" style="background:var(--phy);" onclick="previewSchedule('phy')">GENERATE PLAN</button>
+        </div>
+        <div class="box-title">Assigned Plan</div>
+        <div id="phy-list"></div>
+    </div>
+
+    <div id="chem-page" class="page-view">
+        <div id="chem-header" class="inline-header">
+            <div class="back-arrow" onclick="goHome()">←</div>
+            <h2 class="engine-title" style="color:var(--chem);">Chemistry Engine</h2>
+        </div>
+        
+        <div class="planner-toggle chem" id="chem-planner-btn" onclick="togglePlanner('chem')">➕ OPEN LECTURE PLANNER</div>
+        <div class="glass-box glass-chem planner-box" id="chem-planner-box">
+            
+            <div class="planner-header">
+                <div class="box-title" style="margin:0; color:var(--chem);">PLANNER DETAILS</div>
+                <div class="close-btn" onclick="togglePlanner('chem')">×</div>
+            </div>
+            
+            <span class="input-label" style="margin-top:0;">CHAPTER</span>
+            <select id="chem-select" onchange="updateLastSelected('chem', this.value)"></select>
+            <div id="chem-prev-hint" class="prev-hint"></div>
+
+            <div class="grid-2">
+                <div><span class="input-label">START LEC NO.</span><input type="number" id="chem-lec-start" placeholder="e.g. 1"></div>
+                <div><span class="input-label">TOTAL LECS</span><input type="number" id="chem-lec-count" placeholder="e.g. 5"></div>
+            </div>
+
+            <span class="input-label">PACE</span>
+            <div class="pace-selector">
+                <div class="pace-btn active" id="chem-p-1" onclick="setPace('chem', 1)">1 L/Day</div>
+                <div class="pace-btn" id="chem-p-2" onclick="setPace('chem', 2)">2 L/Day</div>
+                <div class="pace-btn" id="chem-p-3" onclick="setPace('chem', 3)">3 L/Day</div>
+            </div>
+            <input type="hidden" id="chem-pace" value="1">
+
+            <span class="input-label">DURATION (PER LEC)</span>
+            <div class="grid-2">
+                <div><input type="number" id="chem-hr" placeholder="HR" min="0"></div>
+                <div><input type="number" id="chem-min" placeholder="MIN" min="0" max="59"></div>
+            </div>
+            
+            <span class="input-label">START DATE</span><input type="date" id="chem-date">
+            <button class="action-btn" style="background:var(--chem);" onclick="previewSchedule('chem')">GENERATE PLAN</button>
+        </div>
+        <div class="box-title">Assigned Plan</div>
+        <div id="chem-list"></div>
+    </div>
+
+    <div id="bio-page" class="page-view">
+        <div id="bio-header" class="inline-header">
+            <div class="back-arrow" onclick="goHome()">←</div>
+            <h2 class="engine-title" style="color:var(--bio);">Biology Engine</h2>
+        </div>
+        
+        <div class="planner-toggle bio" id="bio-planner-btn" onclick="togglePlanner('bio')">➕ OPEN LECTURE PLANNER</div>
+        <div class="glass-box glass-bio planner-box" id="bio-planner-box">
+            
+            <div class="planner-header">
+                <div class="box-title" style="margin:0; color:var(--bio);">PLANNER DETAILS</div>
+                <div class="close-btn" onclick="togglePlanner('bio')">×</div>
+            </div>
+            
+            <span class="input-label" style="margin-top:0;">CHAPTER</span>
+            <select id="bio-select" onchange="updateLastSelected('bio', this.value)"></select>
+            <div id="bio-prev-hint" class="prev-hint"></div>
+
+            <div class="grid-2">
+                <div><span class="input-label">START LEC NO.</span><input type="number" id="bio-lec-start" placeholder="e.g. 1"></div>
+                <div><span class="input-label">TOTAL LECS</span><input type="number" id="bio-lec-count" placeholder="e.g. 5"></div>
+            </div>
+
+            <span class="input-label">PACE</span>
+            <div class="pace-selector">
+                <div class="pace-btn active" id="bio-p-1" onclick="setPace('bio', 1)">1 L/Day</div>
+                <div class="pace-btn" id="bio-p-2" onclick="setPace('bio', 2)">2 L/Day</div>
+                <div class="pace-btn" id="bio-p-3" onclick="setPace('bio', 3)">3 L/Day</div>
+            </div>
+            <input type="hidden" id="bio-pace" value="1">
+
+            <span class="input-label">DURATION (PER LEC)</span>
+            <div class="grid-2">
+                <div><input type="number" id="bio-hr" placeholder="HR" min="0"></div>
+                <div><input type="number" id="bio-min" placeholder="MIN" min="0" max="59"></div>
+            </div>
+            
+            <span class="input-label">START DATE</span><input type="date" id="bio-date">
+            <button class="action-btn" style="background:var(--bio);" onclick="previewSchedule('bio')">GENERATE PLAN</button>
+        </div>
+        <div class="box-title">Assigned Plan</div>
+        <div id="bio-list"></div>
+    </div>
+
+</div>
+
+<script>
+    /* --- V16.5 LOGIC --- */
+    const SUBJECTS = ['phy', 'chem', 'bio'];
+    const TARGET_DATE = new Date(2027, 4, 2); 
+
+    const baseSyllabus = {
+        phy: ["Basic Mathematics", "Vectors", "Units and Measurements", "Motion in a Straight Line", "Motion in a Plane", "Laws of Motion", "Work, Energy and Power", "Collision", "Center of Mass", "System of Particles and Rotational Motion", "Gravitation", "Mechanical Properties of Solids", "Mechanical Properties of Fluids", "Thermal Properties of Matter", "Thermodynamics", "Kinetic Theory of Gases", "Oscillations", "Waves", "Electric Charges and Fields", "Electrostatic Potential", "Capacitors", "Current Electricity", "Moving Charges and Magnetism", "Magnetism and Matter", "Electromagnetic Induction", "Alternating Current", "Electromagnetic Waves", "Ray Optics and Optical Instruments", "Wave Optics", "Dual Nature of Radiation and Matter", "Atoms", "Nuclei", "Semiconductor Electronics"],
+        chem: ["Some Basic Concepts of Chemistry", "Structure of Atom", "Classification of Elements and Periodicity", "Chemical Bonding and Molecular Structure", "States of Matter", "Thermodynamics", "Equilibrium", "Redox Reactions", "p-Block Elements", "d-Block and f-Block Elements", "Coordination Compounds", "Organic Chemistry: Some Basic Principles and Techniques", "IUPAC Nomenclature", "Isomerism", "Hydrocarbons", "Solutions", "Electrochemistry", "Chemical Kinetics", "Haloalkanes and Haloarenes", "Alcohols, Phenols and Ethers", "Aldehydes, Ketones and Carboxylic Acids", "Amines", "Biomolecules", "Salt Analysis"],
+        bio: ["The Living World", "Biological Classification", "Plant Kingdom", "Animal Kingdom", "Morphology of Flowering Plants", "Anatomy of Flowering Plants", "Structural Organisation in Animals", "Cell: The Unit of Life", "Biomolecules", "Cell Cycle and Cell Division", "Photosynthesis in Higher Plants", "Respiration in Plants", "Plant Growth and Development", "Breathing and Exchange of Gases", "Body Fluids and Circulation", "Excretory Products and their Elimination", "Locomotion and Movement", "Neural Control and Coordination", "Chemical Coordination and Integration", "Sexual Reproduction in Flowering Plants", "Human Reproduction", "Reproductive Health", "Principles of Inheritance and Variation", "Molecular Basis of Inheritance", "Evolution", "Human Health and Disease", "Microbes in Human Welfare", "Biotechnology: Principles and Processes", "Biotechnology and its Applications", "Organisms and Populations", "Ecosystem", "Biodiversity and Conservation"]
+    };
+
+    let customSeq = { phy: [], chem: [], bio: [] };
+    let scheduled = { phy: [], chem: [], bio: [] };
+    let revisionLogs = {}; 
+    let chapterCompletion = { phy: {}, chem: {}, bio: {} }; 
+    let lastSelectedChapter = { phy: "", chem: "", bio: "" }; 
+    let streak = 0, lastActive = "";
+    let currentEditSub = "phy";
+    let isDarkMode = false;
+    let previewBuffer = [];
+    let previewSub = "";
+    let editingChapterState = { sub: "", chap: "" };
+
+    window.addEventListener('DOMContentLoaded', init);
+
+    // Modal scroll lock functions
+    function lockScroll() { document.body.classList.add('modal-open'); }
+    function unlockScroll() { document.body.classList.remove('modal-open'); }
+
+    function init() {
+        if(localStorage.getItem('neet_theme') === 'dark') {
+            isDarkMode = true; document.body.classList.add('dark-mode');
+        }
+        updateThemeUI();
+
+        try {
+            const saved = localStorage.getItem('neet_2027_v14');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                scheduled = parsed.scheduled || scheduled;
+                streak = parsed.streak || 0;
+                lastActive = parsed.lastActive || "";
+                customSeq = parsed.customSeq || { phy: [], chem: [], bio: [] };
+                revisionLogs = parsed.revisionLogs || {};
+                chapterCompletion = parsed.chapterCompletion || { phy: {}, chem: {}, bio: {} };
+                lastSelectedChapter = parsed.lastSelectedChapter || { phy: "", chem: "", bio: "" };
+            }
+        } catch(e) {}
+        
+        SUBJECTS.forEach(sub => {
+            if (!customSeq[sub] || customSeq[sub].length === 0) {
+                customSeq[sub] = baseSyllabus[sub].map((name, i) => ({ name, order: i + 1 }));
+            } else {
+                baseSyllabus[sub].forEach(baseChap => {
+                    if (!customSeq[sub].some(c => c.name === baseChap)) customSeq[sub].push({ name: baseChap, order: customSeq[sub].length + 1 });
+                });
+            }
+            scheduled[sub].forEach((t, i) => { if(!t.id) t.id = Date.now() + i + Math.floor(Math.random()*1000); });
+        });
+
+        handleStreak(false); updateLogChapSelect(); refreshActiveViews();
+    }
+
+    function openMenu() { document.getElementById('mainMenu').classList.add('active'); lockScroll(); }
+    function closeMenu() { document.getElementById('mainMenu').classList.remove('active'); unlockScroll(); }
+    function navFromMenu(pageId) { closeMenu(); openPage(pageId); }
+    
+    function toggleTheme() {
+        isDarkMode = !isDarkMode;
+        if(isDarkMode) { document.body.classList.add('dark-mode'); localStorage.setItem('neet_theme', 'dark'); } 
+        else { document.body.classList.remove('dark-mode'); localStorage.setItem('neet_theme', 'light'); }
+        updateThemeUI();
+    }
+    function updateThemeUI() {
+        document.getElementById('theme-icon').innerText = isDarkMode ? '☀️' : '🌙';
+        document.getElementById('theme-text').innerText = isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode';
+    }
+
+    function forceUpdateApp() { window.location.href = window.location.href.split('?')[0] + '?force_update=' + new Date().getTime(); }
+    function resetApp() {
+        if(confirm("⚠️ DANGER: Are you absolutely sure you want to wipe ALL your data? This cannot be undone!")) {
+            if(confirm("Final confirmation. Wipe everything?")) { localStorage.removeItem('neet_2027_v14'); window.location.reload(); }
+        }
+    }
+
+    function saveData() { localStorage.setItem('neet_2027_v14', JSON.stringify({ scheduled, streak, lastActive, customSeq, revisionLogs, chapterCompletion, lastSelectedChapter })); refreshActiveViews(); }
+
+    function refreshActiveViews() {
+        if (document.getElementById('dashboard').classList.contains('active')) { 
+            renderDashSchedule(); renderRevisions(); updateRings(); 
+        }
+        if (document.getElementById('full-schedule-page').classList.contains('active')) renderFullSchedule();
+        if (document.getElementById('chapter-hub-page').classList.contains('active')) renderChapterHub();
+        if (document.getElementById('priority-hub-page').classList.contains('active')) renderSequenceEditor(currentEditSub);
+        if (document.getElementById('revision-hub-page').classList.contains('active')) renderRevisions();
+        SUBJECTS.forEach(sub => { if (document.getElementById(`${sub}-page`).classList.contains('active')) renderSubjectPage(sub); });
+    }
+
+    function getTodayStr() { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().split('T')[0]; }
+    function formatDateFriendly(dateStr) { if(!dateStr) return ''; return new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' }); }
+    
+    function addDaysToDate(dateStr, days) { 
+        let d = new Date(dateStr + "T00:00:00"); 
+        d.setDate(d.getDate() + days); 
+        return d.toISOString().split('T')[0]; 
+    }
+    
+    function sortTasksByDate(tasks) { return tasks.sort((a,b) => new Date(a.date) - new Date(b.date)); }
+
+    function handleStreak(isActionDone) {
+        const today = getTodayStr();
+        const yesterday = new Date(); yesterday.setMinutes(yesterday.getMinutes() - yesterday.getTimezoneOffset()); yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+        if (isActionDone) {
+            if (lastActive !== today) { streak = (lastActive === yesterdayStr) ? streak + 1 : 1; lastActive = today; }
+        } else {
+            if (lastActive !== today && lastActive !== yesterdayStr && lastActive !== "") streak = 0;
+        }
+        document.getElementById('streak-val').innerText = streak;
+    }
+
+    function triggerConfetti() { if(window.confetti) confetti({ particleCount: 150, spread: 80, origin:{y:0.6}, colors:['#34c759', '#007aff', '#ff9500', '#ff2d55', '#f39c12'] }); }
+
+    function updateRings() {
+        SUBJECTS.forEach(sub => {
+            let totalSyllabus = customSeq[sub].length;
+            let subCompleted = new Set(Object.keys(chapterCompletion[sub])).size;
+            const overallPct = totalSyllabus > 0 ? (subCompleted / totalSyllabus) : 0;
+            document.getElementById(`${sub}Inner`).style.strokeDashoffset = 263.89 * (1 - overallPct);
+            document.getElementById(`${sub}Pct`).innerText = Math.round(overallPct * 100) + '%';
+        });
+
+        const today = getTodayStr();
+        let todayTasks = 0; let completedToday = 0;
+
+        SUBJECTS.forEach(sub => {
+            scheduled[sub].forEach(t => { if(t.date === today) { todayTasks++; if(t.done) completedToday++; } });
+        });
+
+        SUBJECTS.forEach(sub => {
+            scheduled[sub].forEach(t => {
+                if(t.done && t.completedOn) {
+                    [1, 3, 7].forEach(target => {
+                        let revDateStr = addDaysToDate(t.completedOn, target);
+                        let revKey = `lec_${sub}_${t.id}_day${target}`;
+                        if(revDateStr <= today) {
+                            todayTasks++;
+                            if(revisionLogs[revKey] === today || (revisionLogs[revKey] && revisionLogs[revKey] !== true)) completedToday++;
+                        }
+                    });
+                }
+            });
+            for (const [chapName, compDate] of Object.entries(chapterCompletion[sub])) {
+                let currentCycle = Math.floor(Math.floor((new Date(today) - new Date(compDate)) / (1000 * 60 * 60 * 24)) / 30);
+                if(currentCycle >= 1) {
+                    for(let c = 1; c <= currentCycle; c++) {
+                        let revKey = `chap_${sub}_${chapName}_cycle${c}`;
+                        let dueDateStr = addDaysToDate(compDate, c * 30);
+                        if(dueDateStr <= today) {
+                            todayTasks++;
+                            if(revisionLogs[revKey] === today || (revisionLogs[revKey] && revisionLogs[revKey] !== true)) completedToday++;
+                        }
+                    }
+                }
+            }
+        });
+
+        const pct = todayTasks > 0 ? (completedToday / todayTasks) : 0;
+        document.getElementById('today-progress-fill').style.width = Math.round(pct * 100) + '%';
+        document.getElementById('today-progress-pct').innerText = Math.round(pct * 100) + '%';
+        document.getElementById('today-progress-text').innerText = `${completedToday} / ${todayTasks} Completed`;
+    }
+
+    function getAllTasks() {
+        let all = []; SUBJECTS.forEach(s => scheduled[s].forEach(t => all.push({...t, sub:s})));
+        return sortTasksByDate(all);
+    }
+
+    // CHECKBOXES ONLY ON DASHBOARD. HIDE EVERYWHERE ELSE.
+    function generateTaskHTML(t, hideCheckbox = false, showDate = false, showSubject = false, hideChapter = false) {
+        let check = hideCheckbox ? '' : `<div class="checkbox ${t.done?'checked':''}" onclick="toggleTask('${t.sub}', ${t.id})"></div>`;
+        let title = t.chapter;
+        if(t.lec) title = hideChapter ? `Lec ${t.lec}` : `Lec ${t.lec}: ${t.chapter}`;
+        else if(hideChapter) title = "Mission";
+        
+        let doneClass = (t.done && !hideCheckbox) ? 'done' : ''; // Only fade out if checkbox is visible
+
+        return `
+        <div class="task-card ${t.sub} ${doneClass}">
+            <div style="display:flex; align-items:center; flex:1; min-width:0;">
+                ${check}
+                <div class="task-content">
+                    <div class="task-title" title="${t.chapter}">${title}</div>
+                    <div class="task-meta">
+                        ${showSubject ? `<span class="badge badge-${t.sub}">${t.sub.toUpperCase()}</span>` : ''}
+                        ${t.duration ? `<span class="badge badge-time">⏱ ${t.duration}</span>` : ''}
+                        ${showDate ? `<span class="badge badge-time" style="background:var(--${t.sub}); color:white; border:none;">📅 ${formatDateFriendly(t.date)}</span>` : ''}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function renderDashSchedule() {
+        const el = document.getElementById('dash-schedule'); el.innerHTML = "";
+        let todayTasks = getAllTasks().filter(t => t.date === getTodayStr());
+        if(todayTasks.length === 0) el.innerHTML = "<div style='text-align:center; color:var(--text-sub); padding:10px; font-weight:800; font-size:0.85rem;'>No missions mapped for today.</div>";
+        else todayTasks.forEach(t => { el.innerHTML += generateTaskHTML(t, false, false, true, false); });
+    }
+
+    function renderFullSchedule() {
+        const el = document.getElementById('full-schedule-list'); el.innerHTML = "";
+        let futureTasks = getAllTasks().filter(t => t.date >= getTodayStr());
+        if(futureTasks.length === 0) return el.innerHTML = "<div style='text-align:center; color:var(--text-sub); padding:20px; font-weight:800;'>No future missions.</div>";
+
+        let grouped = {};
+        futureTasks.forEach(t => { if(!grouped[t.date]) grouped[t.date] = []; grouped[t.date].push(t); });
+        Object.keys(grouped).sort().forEach(dateStr => {
+            el.innerHTML += `<div class="date-header">${formatDateFriendly(dateStr)}</div>`;
+            grouped[dateStr].forEach(t => { el.innerHTML += generateTaskHTML(t, true, false, true, false); });
+        });
+    }
+
+    function renderRevisions() {
+        const elDue = document.getElementById('dash-rev-due');
+        const elUpcoming = document.getElementById('dash-rev-upcoming');
+        if(elDue) elDue.innerHTML = ""; if(elUpcoming) elUpcoming.innerHTML = "";
+        
+        const today = getTodayStr(); let dueCount = 0; let upcomingGrouped = {};
+
+        SUBJECTS.forEach(sub => {
+            scheduled[sub].forEach(t => {
+                if(t.done && t.completedOn) {
+                    let title = t.lec ? `Lec ${t.lec}: ${t.chapter}` : t.chapter;
+                    [1, 3, 7].forEach(target => {
+                        let revDateStr = addDaysToDate(t.completedOn, target);
+                        let revKey = `lec_${sub}_${t.id}_day${target}`;
+                        if(!revisionLogs[revKey] || revisionLogs[revKey] === true) {
+                            if(revDateStr <= today) {
+                                dueCount++;
+                                if(elDue) elDue.innerHTML += `
+                                    <div class="task-card rev">
+                                        <div class="task-content">
+                                            <div class="task-title">${title}</div>
+                                            <div class="task-meta"><span class="badge badge-rev-lec">DAY ${target}</span><span class="badge badge-${sub}">${sub}</span></div>
+                                        </div>
+                                        <button class="btn-done-rev" onclick="markRevDone('${revKey}')">DONE</button>
+                                    </div>`;
+                            } else {
+                                if(!upcomingGrouped[revDateStr]) upcomingGrouped[revDateStr] = [];
+                                upcomingGrouped[revDateStr].push({ title: title, type: `Day ${target}`, class: 'badge-rev-lec', sub: sub });
+                            }
+                        }
+                    });
+                }
+            });
+
+            for (const [chapName, compDate] of Object.entries(chapterCompletion[sub])) {
+                let currentCycle = Math.floor(Math.floor((new Date(today) - new Date(compDate)) / (1000 * 60 * 60 * 24)) / 30);
+                if(currentCycle >= 1) {
+                    for(let c = 1; c <= currentCycle; c++) {
+                        let revKey = `chap_${sub}_${chapName}_cycle${c}`;
+                        if(!revisionLogs[revKey] || revisionLogs[revKey] === true) {
+                            let dueDateStr = addDaysToDate(compDate, c * 30);
+                            if(dueDateStr <= today) {
+                                dueCount++;
+                                if(elDue) elDue.innerHTML += `
+                                    <div class="task-card rev" style="border-left-color: var(--danger);">
+                                        <div class="task-content">
+                                            <div class="task-title">${chapName}</div>
+                                            <div class="task-meta"><span class="badge badge-rev-sub">M${c} CYCLE</span><span class="badge badge-${sub}">${sub}</span></div>
+                                        </div>
+                                        <button class="btn-done-rev" style="color:var(--danger); border-color:var(--danger);" onclick="markRevDone('${revKey}')">DONE</button>
+                                    </div>`;
+                            }
+                        }
+                    }
+                }
+                let nextDateStr = addDaysToDate(compDate, (currentCycle + 1) * 30);
+                if(!upcomingGrouped[nextDateStr]) upcomingGrouped[nextDateStr] = [];
+                upcomingGrouped[nextDateStr].push({ title: chapName, type: `Month ${currentCycle + 1}`, class: 'badge-rev-sub', sub: sub });
+            }
+        });
+
+        if(elDue && dueCount === 0) elDue.innerHTML = "<div style='color:var(--text-sub); font-size:0.85rem; font-weight:800; padding: 10px 5px;'>✓ 100% caught up!</div>";
+        if(elUpcoming) {
+            let sortedDates = Object.keys(upcomingGrouped).sort();
+            if(sortedDates.length === 0) elUpcoming.innerHTML = "<div style='color:var(--text-sub); font-size:0.85rem; font-weight:800;'>Pipeline is empty.</div>";
+            else {
+                sortedDates.forEach(dateStr => { 
+                    let html = `<details class="pipeline-group"><summary class="pipeline-date"><span>📅 ${formatDateFriendly(dateStr)}</span><span class="chevron">▼</span></summary><div class="pipeline-list">`;
+                    upcomingGrouped[dateStr].forEach(item => {
+                        html += `<div class="task-card" style="padding:10px 14px; margin-bottom:0; border-left-color:var(--rev);">
+                            <div class="task-content"><div class="task-title">${item.title}</div><div class="task-meta"><span class="badge ${item.class}">${item.type}</span><span class="badge badge-${item.sub}">${item.sub}</span></div></div></div>`;
+                    });
+                    html += `</div></details>`; elUpcoming.innerHTML += html;
+                });
+            }
+        }
+    }
+
+    function markRevDone(key) { revisionLogs[key] = getTodayStr(); triggerConfetti(); saveData(); }
+
+    function updateLogChapSelect() {
+        const sub = document.getElementById('log-sub-select').value;
+        const sel = document.getElementById('log-chap-select'); sel.innerHTML = '';
+        customSeq[sub].sort((a,b) => a.order - b.order).forEach(c => { if(!chapterCompletion[sub][c.name]) sel.add(new Option(`${c.order}. ${c.name}`, c.name)); });
+        document.getElementById('log-date-input').value = getTodayStr();
+    }
+
+    function logChapterCompletion() {
+        const sub = document.getElementById('log-sub-select').value;
+        const chap = document.getElementById('log-chap-select').value;
+        const date = document.getElementById('log-date-input').value;
+        if(!chap || !date) return alert("Select chapter and date.");
+        chapterCompletion[sub][chap] = date;
+        if(lastSelectedChapter[sub] === chap) lastSelectedChapter[sub] = "";
+        handleStreak(true); updateLogChapSelect(); triggerConfetti(); saveData();
+    }
+
+    function deleteChapterLog(sub, chapName) {
+        if(!confirm(`Remove ${chapName} from Completed Log?`)) return;
+        delete chapterCompletion[sub][chapName];
+        Object.keys(revisionLogs).forEach(k => { if(k.startsWith(`chap_${sub}_${chapName}_`)) delete revisionLogs[k]; });
+        saveData();
+    }
+
+    function renderChapterHub() {
+        const elLog = document.getElementById('comp-log-list'); elLog.innerHTML = ""; let hasLogs = false;
+        SUBJECTS.forEach(sub => {
+            for (const [chapName, compDate] of Object.entries(chapterCompletion[sub])) {
+                hasLogs = true;
+                elLog.innerHTML += `<div class="task-card comp"><div class="task-content"><div class="task-title">${chapName}</div><div class="task-meta"><span class="badge badge-comp">DONE: ${compDate}</span><span class="badge badge-${sub}">${sub}</span></div></div><div class="btn-act del" onclick="deleteChapterLog('${sub}', '${chapName.replace(/'/g, "\\'")}')">×</div></div>`;
+            }
+        });
+        if(!hasLogs) elLog.innerHTML = "<div style='color:var(--text-sub); font-size:0.85rem; font-weight:800;'>No chapters logged yet.</div>";
+    }
+
+    function handleSequenceShift(sub, oldIdx, newVal) {
+        let newOrder = parseInt(newVal); if(isNaN(newOrder) || newOrder < 1) newOrder = 1;
+        if(newOrder > customSeq[sub].length) newOrder = customSeq[sub].length;
+        let newIdx = newOrder - 1; if (oldIdx === newIdx) return;
+        let item = customSeq[sub].splice(oldIdx, 1)[0]; customSeq[sub].splice(newIdx, 0, item);
+        customSeq[sub].forEach((c, idx) => c.order = idx + 1); renderSequenceEditor(sub);
+    }
+
+    function renderSequenceEditor(sub) {
+        currentEditSub = sub;
+        SUBJECTS.forEach(s => { document.getElementById(`btn-seq-${s}`).className = `tab-btn ${s} ${s === sub ? 'active' : ''}`; });
+        const el = document.getElementById('seq-list-container'); el.innerHTML = "";
+        customSeq[sub].sort((a,b) => a.order - b.order).forEach((c, idx) => {
+            el.innerHTML += `<div class="seq-row"><input type="number" value="${c.order}" min="1" max="${customSeq[sub].length}" onchange="handleSequenceShift('${sub}', ${idx}, this.value)"><span style="font-weight:700; font-size:0.9rem;">${c.name}</span></div>`;
+        });
+    }
+
+    function saveSequence() { saveData(); alert("Sequence Saved!"); }
+
+    function updatePrevHint(sub, chap) {
+        const hintEl = document.getElementById(`${sub}-prev-hint`);
+        if (!chap) { hintEl.innerHTML = ""; return; }
+        let tasks = scheduled[sub].filter(t => t.chapter === chap);
+        if (tasks.length === 0) {
+            hintEl.innerHTML = "📝 No previous history for this chapter.";
+        } else {
+            tasks.sort((a,b) => new Date(b.date) - new Date(a.date));
+            let last = tasks[0];
+            let lecStr = last.lec ? `Lec ${last.lec}` : `Task`;
+            hintEl.innerHTML = `📌 <b>Last Logged:</b> ${lecStr} on ${formatDateFriendly(last.date)}`;
+        }
+    }
+
+    function updateLastSelected(sub, val) { lastSelectedChapter[sub] = val; saveData(); updatePrevHint(sub, val); }
+    
+    function togglePlanner(sub) {
+        let box = document.getElementById(`${sub}-planner-box`);
+        let btn = document.getElementById(`${sub}-planner-btn`);
+        let hdr = document.getElementById(`${sub}-header`);
+        if (box.style.display === "none" || box.style.display === "") {
+            box.style.display = "block"; btn.style.display = "none"; hdr.style.display = "none";
+        } else {
+            box.style.display = "none"; btn.style.display = "block"; hdr.style.display = "flex";
+        }
+    }
+
+    function setPace(sub, val) {
+        document.getElementById(`${sub}-pace`).value = val;
+        [1,2,3].forEach(i => document.getElementById(`${sub}-p-${i}`).classList.remove('active'));
+        document.getElementById(`${sub}-p-${val}`).classList.add('active');
+    }
+
+    function renderSubjectPage(sub) {
+        const sel = document.getElementById(`${sub}-select`); customSeq[sub].sort((a,b) => a.order - b.order);
+        sel.innerHTML = '<option value="">Select Chapter...</option>';
+        customSeq[sub].forEach(c => { if(!chapterCompletion[sub][c.name]) sel.add(new Option(`${c.order}. ${c.name}`, c.name)); });
+        if(lastSelectedChapter[sub]) { sel.value = lastSelectedChapter[sub]; if(!sel.value) lastSelectedChapter[sub] = ""; }
+        updatePrevHint(sub, sel.value);
+
+        // Store open accordions to preserve state
+        let openAccordions = [];
+        document.querySelectorAll(`#${sub}-list .pipeline-group[open]`).forEach(d => openAccordions.push(d.dataset.chap));
+
+        const list = document.getElementById(`${sub}-list`); list.innerHTML = "";
+        let subTasks = sortTasksByDate(scheduled[sub].filter(x=>true));
+        let groupedByChap = {};
+        subTasks.forEach(t => { if(!groupedByChap[t.chapter]) groupedByChap[t.chapter] = []; groupedByChap[t.chapter].push(t); });
+
+        let sortedGroups = Object.entries(groupedByChap).map(([chapName, tasks]) => {
+            let dates = tasks.map(t => t.date).sort();
+            return { chapName, tasks, startDate: dates[0], endDate: dates[dates.length - 1] };
+        }).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+        sortedGroups.forEach(group => {
+            let dateRangeStr = group.startDate === group.endDate ? formatDateFriendly(group.startDate) : `${formatDateFriendly(group.startDate)} — ${formatDateFriendly(group.endDate)}`;
+            let safeChap = group.chapName.replace(/'/g, "\\'");
+            let isOpen = openAccordions.includes(group.chapName) ? "open" : "";
+            
+            let html = `
+            <details class="pipeline-group" data-chap="${group.chapName}" ${isOpen}>
+                <summary class="pipeline-date" style="border-left: 4px solid var(--${sub});">
+                    <div style="text-align: left;">
+                        <div style="font-size:0.95rem; font-weight:800; color:var(--${sub});">${group.chapName}</div>
+                        <div style="font-size:0.7rem; color:var(--text-sub); margin-top:4px;">🗓 ${dateRangeStr}</div>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <div class="btn-act edit" onclick="event.stopPropagation(); openChapterEdit('${sub}', '${safeChap}')">✎</div>
+                        <div class="btn-act del" onclick="event.stopPropagation(); clearSpecificChapterSchedule('${sub}', '${safeChap}')">🗑</div>
+                        <span class="chevron">▼</span>
+                    </div>
+                </summary>
+                <div class="pipeline-list">`;
+            // Hidden checkboxes in the engine view!
+            group.tasks.forEach(t => { html += generateTaskHTML({...t, sub:sub}, true, true, false, true); });
+            html += `</div></details>`; list.innerHTML += html;
+        });
+        if(sortedGroups.length === 0) list.innerHTML = "<div style='color:var(--text-sub); font-size:0.85rem; font-weight:800; padding: 10px 5px;'>No missions planned yet.</div>";
+    }
+
+    // Modal Preview Logic
+    function previewSchedule(sub) {
+        const c = document.getElementById(`${sub}-select`).value;
+        const startLec = parseInt(document.getElementById(`${sub}-lec-start`).value) || 1;
+        const count = parseInt(document.getElementById(`${sub}-lec-count`).value) || 1;
+        const pace = parseInt(document.getElementById(`${sub}-pace`).value) || 1;
+        let d = document.getElementById(`${sub}-date`).value;
+        const hr = document.getElementById(`${sub}-hr`).value || "0";
+        const min = document.getElementById(`${sub}-min`).value || "00";
+
+        if(!c || !d) return alert("Select chapter and start date.");
+
+        let durationStr = "";
+        if(hr !== "0" || min !== "00") durationStr = `${hr.padStart(2,'0')}h ${min.padStart(2,'0')}m`;
+
+        previewBuffer = []; previewSub = sub;
+        let currentDate = d; let currentLec = startLec;
+
+        for(let i=0; i<count; i++) {
+            previewBuffer.push({ id: Date.now() + i + Math.floor(Math.random()*1000), chapter: c, lec: currentLec, duration: durationStr, date: currentDate, done: false, completedOn: null });
+            currentLec++;
+            if ((i + 1) % pace === 0) currentDate = addDaysToDate(currentDate, 1);
+        }
+
+        renderPreviewModalList();
+        document.getElementById('scheduleModal').classList.add('active');
+        lockScroll();
+    }
+
+    function renderPreviewModalList() {
+        const listEl = document.getElementById('modal-preview-list'); listEl.innerHTML = "";
+        previewBuffer.forEach((t, i) => {
+            listEl.innerHTML += `
+            <div style="background:var(--input-bg); padding:12px; border-radius:12px; border:1px solid var(--glass-border); display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <span style="font-weight:800; font-size:0.9rem;">Lec ${t.lec}</span>
+                    <span style="font-size:0.75rem; color:var(--text-sub);">${formatDateFriendly(t.date)}</span>
+                </div>
+                <div class="btn-act shift" onclick="shiftPreview(${i})" title="Shift this and subsequent by +1 day">➔</div>
+            </div>`;
+        });
+    }
+
+    function shiftPreview(index) {
+        for(let i=index; i<previewBuffer.length; i++) {
+            previewBuffer[i].date = addDaysToDate(previewBuffer[i].date, 1);
+        }
+        renderPreviewModalList();
+    }
+
+    function confirmSchedule() {
+        scheduled[previewSub].push(...previewBuffer);
+        
+        document.getElementById(`${previewSub}-lec-start`).value = "";
+        document.getElementById(`${previewSub}-lec-count`).value = "";
+        document.getElementById(`${previewSub}-date`).value = "";
+        document.getElementById(`${previewSub}-hr`).value = "";
+        document.getElementById(`${previewSub}-min`).value = "";
+        
+        updatePrevHint(previewSub, previewBuffer[0].chapter);
+        saveData(); 
+        closeModal();
+    }
+    
+    function closeModal() { document.getElementById('scheduleModal').classList.remove('active'); unlockScroll(); }
+
+    // CHAPTER EDIT MODAL LOGIC
+    function openChapterEdit(sub, chap) {
+        editingChapterState = { sub, chap };
+        document.getElementById('edit-modal-title').innerText = `Edit: ${chap}`;
+        document.getElementById('edit-chap-name').value = chap;
+        renderChapterEditList();
+        document.getElementById('chapterEditModal').classList.add('active');
+        lockScroll();
+    }
+
+    function renderChapterEditList() {
+        let tasks = scheduled[editingChapterState.sub].filter(t => t.chapter === editingChapterState.chap);
+        tasks.sort((a,b) => new Date(a.date) - new Date(b.date));
+        
+        let html = '';
+        tasks.forEach(t => {
+            html += `
+            <div style="background:var(--input-bg); padding:12px; border-radius:12px; border:1px solid var(--glass-border); display:flex; flex-direction:column; gap:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <span style="font-weight:800; font-size:0.75rem; color:var(--text-sub);">LEC</span>
+                        <input type="number" value="${t.lec}" onchange="updateTaskInline(${t.id}, 'lec', this.value)" style="width:50px; padding:6px; font-size:0.85rem; text-align:center;">
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <div class="btn-act shift" title="Shift future dates" onclick="shiftTaskInline(${t.id})">➔</div>
+                        <div class="btn-act del" onclick="deleteTaskInline(${t.id})">×</div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <div style="flex:1; display:flex; flex-direction:column;">
+                        <input type="date" value="${t.date}" onchange="updateTaskInline(${t.id}, 'date', this.value)" style="padding:8px; font-size:0.8rem;">
+                        <span style="font-size:0.65rem; color:var(--text-sub); font-weight:700; margin-top:2px; margin-left:4px;">${formatDateFriendly(t.date)}</span>
+                    </div>
+                    <input type="text" placeholder="2h 30m" value="${t.duration}" onchange="updateTaskInline(${t.id}, 'duration', this.value)" style="width:75px; padding:8px; font-size:0.8rem; text-align:center;">
+                </div>
+            </div>`;
+        });
+        if(tasks.length === 0) html = "<div style='color:var(--text-sub); font-size:0.8rem; font-weight:800;'>No active lectures found.</div>";
+        document.getElementById('chapter-edit-list').innerHTML = html;
+    }
+
+    function updateTaskInline(id, field, value) {
+        let task = scheduled[editingChapterState.sub].find(t => t.id === id); if(!task) return;
+        task[field] = value;
+        saveData(); renderChapterEditList(); 
+    }
+
+    function deleteTaskInline(id) {
+        scheduled[editingChapterState.sub] = scheduled[editingChapterState.sub].filter(t => t.id !== id);
+        saveData(); renderChapterEditList();
+    }
+
+    function shiftTaskInline(id) {
+        let task = scheduled[editingChapterState.sub].find(t => t.id === id); if(!task) return;
+        let tasksToShift = scheduled[editingChapterState.sub].filter(t => t.chapter === editingChapterState.chap && t.date >= task.date && !t.done);
+        if(confirm(`Shift Lec ${task.lec} and all following uncompleted lectures forward by 1 day?`)) {
+            tasksToShift.forEach(t => { t.date = addDaysToDate(t.date, 1); });
+            saveData(); renderChapterEditList();
+        }
+    }
+
+    function clearSpecificChapterSchedule(sub, chap) {
+        if(confirm(`WARNING: Are you sure you want to delete ALL planned lectures for "${chap}"?`)) {
+            scheduled[sub] = scheduled[sub].filter(t => t.chapter !== chap);
+            saveData();
+        }
+    }
+
+    function clearChapterSchedule() {
+        let chap = document.getElementById('edit-chap-name').value;
+        clearSpecificChapterSchedule(editingChapterState.sub, chap);
+        closeChapterEditModal();
+    }
+
+    function closeChapterEditModal() { document.getElementById('chapterEditModal').classList.remove('active'); unlockScroll(); }
+
+    function toggleTask(sub, id) {
+        let task = scheduled[sub].find(t => t.id === id); if(!task) return;
+        task.done = !task.done;
+        
+        if(task.done) { 
+            task.completedOn = getTodayStr(); 
+            handleStreak(true); 
+            triggerConfetti(); 
+        } else { 
+            task.completedOn = null; 
+        }
+
+        // Smart Auto-Chapter Complete Detection
+        let chapTasks = scheduled[sub].filter(t => t.chapter === task.chapter);
+        let allDone = chapTasks.length > 0 && chapTasks.every(t => t.done);
+        
+        if (allDone && !chapterCompletion[sub][task.chapter]) {
+            chapterCompletion[sub][task.chapter] = getTodayStr();
+            setTimeout(() => { alert(`🎉 AWESOME! You finished every lecture for "${task.chapter}". It has been automatically added to your 30-Day Revision Tracker!`); }, 500);
+        } else if (!allDone && chapterCompletion[sub][task.chapter]) {
+            delete chapterCompletion[sub][task.chapter];
+        }
+
+        saveData(); 
+    }
+
+    function goHome() { openPage('dashboard'); }
+    function openPage(id) {
+        document.querySelectorAll('.page-view').forEach(e => e.classList.remove('active'));
+        let targetId = id === 'dashboard' || id.includes('-page') ? id : id + '-page';
+        document.getElementById(targetId).classList.add('active');
+        refreshActiveViews(); window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    setInterval(() => {
+        const diff = TARGET_DATE - new Date(); if(diff < 0) return;
+        document.getElementById('d').innerText = Math.floor(diff/(1000*60*60*24));
+        document.getElementById('h').innerText = Math.floor((diff%(1000*60*60*24))/(1000*60*60)).toString().padStart(2, '0');
+        document.getElementById('m').innerText = Math.floor((diff%(1000*60*60))/(1000*60)).toString().padStart(2, '0');
+        document.getElementById('s').innerText = Math.floor((diff%(1000*60))/1000).toString().padStart(2, '0');
+    }, 1000);
+</script>
+</body>
+</html>
